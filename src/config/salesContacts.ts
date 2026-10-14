@@ -12,6 +12,7 @@ export const salesContacts: SalesContact[] = [
   { name: "شمس", phone: "01260094248" },
   { name: "هشام عبدالحي", phone: "01227156258" },
   { name: "بسملة", phone: "01208839485" },
+  { name: "عمرو سامح", phone: "01092252144" },
   { name: "شريف رضا — ADMIN", phone: "01093525178", admin: true },
   { name: "شريف رضا — ADMIN", phone: "01208840531", admin: true },
 ];
