@@ -57,7 +57,7 @@ export const S = {
     subTotalLabel: "الاجمالى",
     vatLabel: "الضريبة (14%)",
     discountLabel: "الخصم",
-    totalLabel: "الصافى",
+    totalLabel: "الاجمالي",
     wordsPrefix: "فقط",
     wordsSuffix: "لا غير",
   },
