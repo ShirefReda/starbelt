@@ -110,7 +110,12 @@
   /* Remove textarea resize artifacts in print. */
   .sheet-page textarea {
     resize: none !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     height: auto !important;
+  }
+
+  .thanks-wrap {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }

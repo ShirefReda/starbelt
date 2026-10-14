@@ -510,12 +510,14 @@ interface TailBlockProps {
         )}
       </div>
 
-      <AutoTextarea
-        class="thanks-field"
-        value={quotation.thankYou}
-        aria-label="سطر الشكر"
-        onInput={(e) => actions.setThankYou((e.currentTarget as HTMLTextAreaElement).value)}
-      />
+      <div class="thanks-wrap">
+        <AutoTextarea
+          class="thanks-field"
+          value={quotation.thankYou}
+          aria-label="سطر الشكر"
+          onInput={(e) => actions.setThankYou((e.currentTarget as HTMLTextAreaElement).value)}
+        />
+      </div>
 
       <div class="approval-line">
         <span class="approval-line__left">
