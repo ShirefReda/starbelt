@@ -6,6 +6,7 @@ import { S } from "./i18n/strings";
 import { Toolbar } from "./components/Toolbar";
 import { Sheet } from "./components/Sheet";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { WhatsappDialog } from "./components/WhatsappDialog";
 import { exportPdf } from "./pdf/exporter";
 import { requestFocus } from "./state/focusBus";
 import { mergeCompany } from "./config/companyMerge";
@@ -17,6 +18,7 @@ export function App() {
   const [zoom, setZoom] = useState(1);
   const [fitMode, setFitMode] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [showWhatsapp, setShowWhatsapp] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -170,6 +172,7 @@ export function App() {
           onNew={handleNew}
           onAddItem={handleAddItem}
           onDownloadPdf={handleDownloadPdf}
+          onSendWhatsapp={() => setShowWhatsapp(true)}
           onPrint={handleDownloadPdf}
           onSettings={() => setShowSettings(true)}
           onClear={handleClear}
@@ -232,6 +235,14 @@ export function App() {
           onSaveCompany={handleSaveCompany}
           onResetCompany={handleResetCompany}
           onImportQuotation={handleImportQuotation}
+          onToast={pushToast}
+        />
+      )}
+
+      {showWhatsapp && (
+        <WhatsappDialog
+          quotation={state.quotation}
+          onClose={() => setShowWhatsapp(false)}
           onToast={pushToast}
         />
       )}

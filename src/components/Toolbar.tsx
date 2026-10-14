@@ -10,6 +10,7 @@ import {
   IconRedo,
   IconTrash,
   IconUndo,
+  IconWhatsapp,
   IconZoomIn,
   IconZoomOut,
 } from "./icons";
@@ -22,6 +23,7 @@ interface ToolbarProps {
   onNew: () => void;
   onAddItem: () => void;
   onDownloadPdf: () => void;
+  onSendWhatsapp: () => void;
   onPrint: () => void;
   onSettings: () => void;
   onClear: () => void;
@@ -40,6 +42,7 @@ export function Toolbar({
   onNew,
   onAddItem,
   onDownloadPdf,
+  onSendWhatsapp,
   onPrint,
   onSettings,
   onClear,
@@ -149,6 +152,16 @@ export function Toolbar({
         >
           <IconPdf />
           <span class="btn__label">{S.toolbar.downloadPdf}</span>
+        </button>
+        <button
+          type="button"
+          class="btn"
+          onClick={onSendWhatsapp}
+          title={S.toolbar.sendWhatsapp}
+          style={{ background: "var(--success)", borderColor: "var(--success)", color: "#fff" }}
+        >
+          <IconWhatsapp />
+          <span class="btn__label">{S.toolbar.sendWhatsapp}</span>
         </button>
         <button
           type="button"

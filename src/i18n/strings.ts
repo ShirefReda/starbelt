@@ -11,6 +11,7 @@ export const S = {
     addItem: "إضافة صنف",
     downloadPdf: "تحميل PDF",
     downloadPdfDirect: "تحميل مباشر (صورة)",
+    sendWhatsapp: "إرسال واتساب",
     print: "طباعة",
     settings: "الإعدادات",
     clear: "مسح",
@@ -107,6 +108,9 @@ export const S = {
     printInstructions: "اختر «حفظ كملف PDF» (Save as PDF) من نافذة الطباعة لتنزيل العرض.",
     imported: "تم استيراد العرض بنجاح",
     importError: "تعذر استيراد الملف — صيغة غير صالحة.",
+    whatsappSent: "تم إرسال عرض السعر عبر واتساب",
+    whatsappError: "تعذر الإرسال إلى واتساب",
+    whatsappNoSelection: "اختر رقمًا واحدًا على الأقل",
   },
   a11y: {
     mainContent: "المحتوى الرئيسى",
