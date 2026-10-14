@@ -27,7 +27,7 @@ export const S = {
     clientPrefix: "شركه / ",
     clientPlaceholder: "اسم الشركة / العميل",
     colIndex: "م",
-    colItem: "أسم الصنف",
+    colItem: "الصنف",
     colQty: "عدد",
     colPrice: "سعر القطعة",
     colTotal: "الاجمالي",
