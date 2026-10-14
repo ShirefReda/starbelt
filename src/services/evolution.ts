@@ -59,7 +59,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 }
 
 /**
- * Send the quotation PNG as a document to one WhatsApp number.
+ * Send the quotation blob as a document to one WhatsApp number.
  *
  * Mirrors starbelt-main's /api/send path + POST /message/sendMedia/{instance}
  * payload — same field names and same "no data-uri prefix" convention.
@@ -68,10 +68,11 @@ export async function sendQuotationMedia(params: {
   normalizedNumber: string; // 20...
   blob: Blob;
   fileName: string;
+  mimetype: string;
   caption: string;
   config: EvolutionConfig;
 }): Promise<unknown> {
-  const { normalizedNumber, blob, fileName, caption, config } = params;
+  const { normalizedNumber, blob, fileName, mimetype, caption, config } = params;
   const media = await blobToBase64(blob);
 
   // Try direct Evolution first; if that fails with a network/CORS error, fall
@@ -79,7 +80,7 @@ export async function sendQuotationMedia(params: {
   const payload = {
     number: normalizedNumber,
     mediatype: "document",
-    mimetype: "image/png",
+    mimetype,
     media,
     fileName,
     caption,

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { IconClose } from "./icons";
 import { salesContacts, type SalesContact } from "../config/salesContacts";
-import { normalizeEgyptianNumber, renderSheetAsPngBlob, fileNameForQuote } from "../utils/whatsapp";
+import { normalizeEgyptianNumber } from "../utils/whatsapp";
+import { renderQuoteMedia, type QuoteMediaKind } from "../utils/quoteMedia";
 import { resolveEvolutionConfig, sendQuotationMedia, type EvolutionConfig } from "../services/evolution";
 import type { Quotation } from "../state/quotation";
 import { S } from "../i18n/strings";
@@ -16,6 +17,7 @@ type Step = "render" | "done";
 
 export function WhatsappDialog({ quotation, onClose, onToast }: WhatsappDialogProps) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set<string>());
+  const [mediaKind, setMediaKind] = useState<QuoteMediaKind>("png");
   const [step, setStep] = useState<Step>("render");
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -53,16 +55,6 @@ export function WhatsappDialog({ quotation, onClose, onToast }: WhatsappDialogPr
       return;
     }
 
-    let blob: Blob;
-    try {
-      blob = await renderSheetAsPngBlob(sheetEl);
-    } catch (e) {
-      setBusy(false);
-      onToast(e instanceof Error ? e.message : "تعذر تحويل الورقة إلى صورة", true);
-      return;
-    }
-
-    const fileName = fileNameForQuote(quotation.client);
     const caption = quotation.client
       ? `عرض سعر — ${quotation.client}`
       : `عرض سعر — ${quotation.number || new Date().toISOString().slice(0, 10)}`;
@@ -79,10 +71,12 @@ export function WhatsappDialog({ quotation, onClose, onToast }: WhatsappDialogPr
         continue;
       }
       try {
+        const rendered = await renderQuoteMedia(sheetEl, quotation.client, mediaKind);
         await sendQuotationMedia({
           normalizedNumber: num,
-          blob,
-          fileName,
+          blob: rendered.blob,
+          fileName: rendered.fileName,
+          mimetype: rendered.mimetype,
           caption,
           config: config!,
         });
@@ -90,11 +84,11 @@ export function WhatsappDialog({ quotation, onClose, onToast }: WhatsappDialogPr
       } catch (e) {
         nextErrors[c.phone] = e instanceof Error ? e.message : "فشل الإرسال";
       }
+      setSuccess([...nextSuccess]);
+      setErrors({ ...nextErrors });
     }
 
     setBusy(false);
-    setErrors(nextErrors);
-    setSuccess(nextSuccess);
     setStep("done");
     if (nextSuccess.length > 0) onToast(`تم الإرسال إلى ${nextSuccess.length} رقم`);
     if (nextSuccess.length === 0 && Object.keys(nextErrors).length > 0) {
@@ -134,9 +128,32 @@ export function WhatsappDialog({ quotation, onClose, onToast }: WhatsappDialogPr
           )}
 
           <p class="hint" style={{ marginTop: 0 }}>
-            اختر واحدًا أو أكثر. سيُرسل نفس عرض السعر كصورة إلى كل رقم مُحدد عبر نفس قناة
+            اختر واحدًا أو أكثر. سيُرسل نفس عرض السعر إلى كل رقم مُحدد عبر نفس قناة
             starbelt main (Evolution API — <code>POST /message/sendMedia/{"{"}instance{"}"}</code>).
           </p>
+
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <label class={`btn${mediaKind === "png" ? " btn--primary" : ""}`} style={{ flex: 1, justifyContent: "center" }}>
+              <input
+                type="radio"
+                name="wa-media-kind"
+                checked={mediaKind === "png"}
+                onChange={() => setMediaKind("png")}
+                style={{ marginInlineEnd: 6 }}
+              />
+              صورة (PNG)
+            </label>
+            <label class={`btn${mediaKind === "pdf" ? " btn--primary" : ""}`} style={{ flex: 1, justifyContent: "center" }}>
+              <input
+                type="radio"
+                name="wa-media-kind"
+                checked={mediaKind === "pdf"}
+                onChange={() => setMediaKind("pdf")}
+                style={{ marginInlineEnd: 6 }}
+              />
+              بي دي اف (PDF)
+            </label>
+          </div>
 
           <div class="whatsapp-list" role="group" aria-label="قائمة الأرقام">
             {salesContacts.map((c: SalesContact) => {
@@ -167,7 +184,7 @@ export function WhatsappDialog({ quotation, onClose, onToast }: WhatsappDialogPr
           </div>
 
           <div style={{ marginTop: 12, color: "var(--text-muted)", fontSize: 12 }}>
-            ملف الإرسال: <code>{fileNameForQuote(quotation.client)}</code>
+            ملف الإرسال: <code>{mediaKind === "pdf" ? `عرض سعر - ${quotation.client || "—"} - ${new Date().toISOString().slice(0, 10)}.pdf` : `عرض سعر - ${quotation.client || "—"} - ${new Date().toISOString().slice(0, 10)}.png`}</code>
           </div>
 
           {step === "done" && success.length > 0 && (

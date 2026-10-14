@@ -2,6 +2,9 @@
  * WhatsApp helpers — same normalization rules as starbelt-main's
  * normalize_egyptian_number, so any number staff type matches the
  * Evolution API's expectations.
+ *
+ * Media helpers live in src/utils/quoteMedia.ts now; this module keeps only
+ * number normalization so existing imports stay valid.
  */
 
 export function normalizeEgyptianNumber(raw: string): string {
@@ -23,59 +26,6 @@ export function isValidEgyptianNumber(raw: string): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Render the quotation as a PNG Blob by rasterizing the visible sheet.
- * Reuses the same raster path as the PDF fallback (html2canvas) — keeps the
- * WhatsApp media identical to what the staff sees.
- */
-export async function renderSheetAsPngBlob(sheetEl: HTMLElement): Promise<Blob> {
-  const { default: html2canvas } = await import("html2canvas");
-  const scaleEl = document.querySelector<HTMLElement>(".sheet-scale");
-  const prev = scaleEl?.style.transform ?? "";
-  if (scaleEl) scaleEl.style.transform = "none";
-
-  const pages = Array.from(sheetEl.querySelectorAll<HTMLElement>(".sheet-page"));
-  const singleBlob = async (el: HTMLElement): Promise<Blob> => {
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      backgroundColor: "#ffffff",
-      useCORS: true,
-      logging: false,
-    });
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png", 1);
-    });
-  };
-
-  let blob: Blob;
-  if (pages.length > 1) {
-    const canvases = await Promise.all(pages.map((p) => html2canvas(p, {
-      scale: 2, backgroundColor: "#ffffff", useCORS: true, logging: false,
-    })));
-    const { width } = canvases[0]!;
-    const merged = document.createElement("canvas");
-    merged.width = width;
-    merged.height = canvases.reduce((h, c) => h + c.height, 0);
-    const ctx = merged.getContext("2d");
-    if (!ctx) throw new Error("canvas context");
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, merged.width, merged.height);
-    let y = 0;
-    for (const c of canvases) {
-      ctx.drawImage(c, 0, y);
-      y += c.height;
-    }
-    blob = await new Promise<Blob>((resolve, reject) => {
-      merged.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png", 1);
-    });
-  } else {
-    blob = await singleBlob((pages[0] as HTMLElement) ?? sheetEl);
-  }
-
-  if (scaleEl) scaleEl.style.transform = prev;
-  return blob;
 }
 
 export function fileNameForQuote(client: string): string {
