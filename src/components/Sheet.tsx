@@ -443,8 +443,9 @@ interface TailBlockProps {
   measuring?: boolean;
 }
 
-function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
+  function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
   const options = quotation.options;
+  const currentDate = displayDate(new Date());
   return (
     <div class="tail-block">
       <div class="totals-stack">
@@ -517,14 +518,19 @@ function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
       />
 
       <div class="approval-line">
-        <span>{S.sheet.approval}</span>
-        <input
-          class="approval-line__input"
-          type="text"
-          value={quotation.approver}
-          aria-label={S.sheet.approval}
-          onInput={(e) => actions.setApprover((e.currentTarget as HTMLInputElement).value)}
-        />
+        <span class="approval-line__left">
+          <span>{S.sheet.approval}</span>
+          <input
+            class="approval-line__input"
+            type="text"
+            value={quotation.approver}
+            aria-label={S.sheet.approval}
+            onInput={(e) => actions.setApprover((e.currentTarget as HTMLInputElement).value)}
+          />
+        </span>
+        <span class="approval-line__date" dir="ltr">
+          {currentDate}
+        </span>
       </div>
     </div>
   );

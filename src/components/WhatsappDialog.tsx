@@ -161,7 +161,10 @@ export function WhatsappDialog({ quotation, onClose, onToast }: WhatsappDialogPr
               const err = errors[c.phone];
               const ok = success.includes(c.phone);
               return (
-                <label key={c.phone} class={`whatsapp-option${checked ? " selected" : ""}${busy ? " disabled" : ""}`}>
+                <label
+                  key={c.phone}
+                  class={`whatsapp-option${checked ? " selected" : ""}${busy ? " disabled" : ""}${c.admin ? " admin" : ""}`}
+                >
                   <input
                     type="checkbox"
                     checked={checked}
@@ -171,6 +174,7 @@ export function WhatsappDialog({ quotation, onClose, onToast }: WhatsappDialogPr
                   <div class="whatsapp-option__body">
                     <div class="whatsapp-option__name">
                       {c.name}
+                      {c.admin && <span class="whatsapp-admin-badge">ADMIN</span>}
                       {ok && <span class="whatsapp-badge ok">تم</span>}
                       {err && <span class="whatsapp-badge err">{err}</span>}
                     </div>
