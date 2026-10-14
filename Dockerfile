@@ -12,7 +12,7 @@ FROM nginx:stable-alpine AS runtime
 # SPA fallback: all 404s -> index.html (so PWA routes work)
 COPY --from=build /app/dist /usr/share/nginx/html
 RUN printf 'server {\n\
-  listen 80;\n\
+  listen 8000;\n\
   server_name _;\n\
   root /usr/share/nginx/html;\n\
   index index.html;\n\
@@ -30,4 +30,4 @@ RUN printf 'server {\n\
     add_header Cache-Control "no-cache";\n\
   }\n\
 }\n' > /etc/nginx/conf.d/default.conf
-EXPOSE 80
+EXPOSE 8000
