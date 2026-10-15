@@ -85,6 +85,12 @@
     break-after: auto;
   }
 
+  /* Disable editing helpers in print. */
+  body.is-editing .client-line__input,
+  body.is-editing .approval-line__input {
+    border: none !important;
+  }
+
   /* Inputs / textareas inside the sheet print their values cleanly. */
   .sheet-page input,
   .sheet-page textarea {
@@ -112,6 +118,11 @@
     resize: none !important;
     overflow: visible !important;
     height: auto !important;
+  }
+
+  .tail-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   .thanks-wrap {

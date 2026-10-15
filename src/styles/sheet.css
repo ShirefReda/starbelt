@@ -65,14 +65,14 @@
 .company-block__name {
   font-size: 22px;
   font-weight: 900;
-  color: #123a5e;
+  color: #000;
   line-height: 1.15;
 }
 
 .company-block__meta {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 700;
-  color: #31506b;
+  color: #0d2440;
   line-height: 1.4;
 }
 
@@ -130,7 +130,7 @@
   text-align: center;
   font-size: 36px;
   font-weight: 900;
-  color: #123a5e;
+  color: #1f6b99;
   margin: 0 0 1.5mm;
   text-decoration: underline;
   text-underline-offset: 5px;
@@ -149,12 +149,14 @@
 .client-line {
   display: flex;
   align-items: center;
-  gap: 2mm;
+  gap: 0;
   font-size: 22px;
   font-weight: 800;
-  color: #123a5e;
+  color: #1f6b99;
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-color: #1f6b99;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
   padding-bottom: 3mm;
   margin-bottom: 3mm;
   min-height: 11mm;
@@ -171,18 +173,36 @@
   font-family: inherit;
   font-size: 22px;
   font-weight: 800;
-  color: #12345e;
+  color: #1f6b99;
   background: transparent;
   border: 0;
   outline: none;
-  border-bottom: 1.5px dashed rgba(31, 107, 153, 0.5);
   padding: 0 1mm 1mm;
   text-align: right;
 }
 
-.client-line__input:focus {
+.client-line__screen {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 1;
+}
+.client-line__print {
+  display: none;
+  unicode-bidi: plaintext;
+}
+@media print {
+  .client-line__screen { display: none !important; }
+  .client-line__print { display: inline !important; }
+}
+
+/* Editing hint: dashed underline only on screen editing, never in PDF */
+body.is-editing .client-line__input {
+  border-bottom: 1.5px dashed rgba(31, 107, 153, 0.5);
+}
+body.is-editing .client-line__input:focus {
   border-bottom-style: solid;
-  border-bottom-color: #123a5e;
+  border-bottom-color: #1f6b99;
 }
 
 /* ---- Items table -------------------------------------------------------- */
@@ -202,11 +222,13 @@
 
 .table-wrap thead th {
   background: #e8e8e8;
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 800;
   text-align: center;
-  color: #0d2440;
+  color: #000;
   line-height: 1.3;
+  white-space: nowrap;
+  padding-block: 2mm;
 }
 
 .table-wrap .col-num {
@@ -274,7 +296,7 @@
   text-align: center;
   font-size: 24px;
   font-weight: 800;
-  background: #fbfdff;
+  background: #ffffff;
 }
 
 .number-cell-input {
@@ -292,7 +314,7 @@
 
 /* Totals / VAT / discount rows */
 .trow-subtotal {
-  background: #fbfdff;
+  background: #ffffff;
 }
 .trow-subtotal td {
   font-size: 17px;
@@ -301,7 +323,7 @@
 .trow-grand td {
   font-size: 19px;
   font-weight: 900;
-  background: #f0f6fd;
+  background: #ffffff;
 }
 
 .trow-label {
@@ -313,6 +335,8 @@
 /* ---- Tail block: notes, words, thanks, approval ------------------------- */
 
 .tail-block {
+  break-inside: avoid;
+  page-break-inside: avoid;
   margin-top: 5mm;
   display: flex;
   flex-direction: column;
@@ -330,6 +354,7 @@
   display: flex;
   gap: 2mm;
   align-items: flex-start;
+  direction: rtl;
 }
 
 .note-row__num {
@@ -343,7 +368,7 @@
   font-family: inherit;
   font-size: 18px;
   font-weight: 800;
-  color: #0d2440;
+  color: #000;
   background: transparent;
   border: 0;
   outline: none;
@@ -352,6 +377,20 @@
   display: block;
   padding: 0;
   text-align: right;
+  unicode-bidi: plaintext;
+}
+.note-editor__print {
+  display: none;
+  font-size: 18px;
+  font-weight: 800;
+  color: #000;
+  text-align: right;
+  unicode-bidi: plaintext;
+  flex: 1;
+}
+@media print {
+  .note-row .note-editor { display: none !important; }
+  .note-editor__print { display: block !important; }
 }
 
 .words-line {
@@ -404,17 +443,20 @@
 .approval-line {
   font-size: 16px;
   font-weight: 800;
-  color: #0d2440;
+  color: #000;
   display: flex;
   align-items: center;
   gap: 4mm;
-  justify-content: space-between;
+  justify-content: flex-start;
+  text-align: left;
+  direction: ltr;
 }
 
 .approval-line__left {
   display: flex;
   align-items: center;
   gap: 2mm;
+  direction: ltr;
 }
 
 .approval-line__date {
@@ -425,22 +467,31 @@
   direction: ltr;
 }
 
+.approval-line__screen { display: flex; align-items: center; gap: 2mm; }
+.approval-line__print { display: none; font-size: 16px; font-weight: 800; color: #000; direction: ltr; }
+@media print {
+  .approval-line__screen { display: none !important; }
+  .approval-line__print { display: inline !important; }
+}
 .approval-line__input {
   font-family: inherit;
   font-size: 16px;
   font-weight: 800;
-  color: #12345e;
+  color: #000;
   background: transparent;
   border: 0;
   outline: none;
-  border-bottom: 1.5px dashed rgba(31, 107, 153, 0.5);
   padding: 0 1mm 1mm;
   width: 120px;
+  direction: ltr;
+  text-align: left;
 }
-
-.approval-line__input:focus {
+body.is-editing .approval-line__input {
+  border-bottom: 1.5px dashed rgba(31, 107, 153, 0.5);
+}
+body.is-editing .approval-line__input:focus {
   border-bottom-style: solid;
-  border-bottom-color: #123a5e;
+  border-bottom-color: #000;
 }
 
 /* ---- Footer band -------------------------------------------------------- */
@@ -462,9 +513,9 @@
 }
 
 .footer-address {
-  font-size: 12.5px;
-  font-weight: 800;
-  color: #27496a;
+  font-size: 14px;
+  font-weight: 700;
+  color: #000;
   max-width: 85mm;
   text-align: right;
   line-height: 1.5;
@@ -473,9 +524,9 @@
 .footer-contact {
   direction: ltr;
   text-align: left;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
-  color: #27496a;
+  color: #000;
   line-height: 1.7;
   font-family: "Segoe UI", Tahoma, sans-serif;
 }

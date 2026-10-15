@@ -271,15 +271,22 @@ function SheetPage({
               </div>
             )}
             <div class="client-line">
-              <span class="client-line__prefix">{S.sheet.clientPrefix}</span>
-              <input
-                class="client-line__input"
-                type="text"
-                value={quotation.client}
-                placeholder={S.sheet.clientPlaceholder}
-                aria-label={S.sheet.clientPlaceholder}
-                onInput={(e) => actions.setClient((e.currentTarget as HTMLInputElement).value)}
-              />
+              {/* Screen: editable input */}
+              <span class="client-line__screen" dir="rtl">
+                <span class="client-line__prefix">{S.sheet.clientPrefix}</span>
+                <input
+                  class="client-line__input"
+                  type="text"
+                  value={quotation.client}
+                  placeholder={S.sheet.clientPlaceholder}
+                  aria-label={S.sheet.clientPlaceholder}
+                  onInput={(e) => actions.setClient((e.currentTarget as HTMLInputElement).value)}
+                />
+              </span>
+              {/* Print: static bidi-isolated text */}
+              <span class="client-line__print" dir="rtl">
+                <bdi>{S.sheet.clientPrefix}{quotation.client || S.sheet.clientPlaceholder}</bdi>
+              </span>
             </div>
           </>
         ) : (
@@ -443,9 +450,8 @@ interface TailBlockProps {
   measuring?: boolean;
 }
 
-  function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
+function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
   const options = quotation.options;
-  const currentDate = displayDate(new Date());
   return (
     <div class="tail-block">
       <div class="totals-stack">
@@ -484,10 +490,13 @@ interface TailBlockProps {
               class="note-editor"
               value={note.text}
               aria-label={`ملاحظة ${i + 1}`}
+              dir="rtl"
               onInput={(e) =>
                 actions.setNoteText(note.id, (e.currentTarget as HTMLTextAreaElement).value)
               }
             />
+            {/* Print static version for bidi-correct rendering */}
+            <span class="note-editor__print" dir="rtl"><bdi>{note.text}</bdi></span>
             {!measuring && (
               <button
                 type="button"
@@ -520,7 +529,7 @@ interface TailBlockProps {
       </div>
 
       <div class="approval-line">
-        <span class="approval-line__left">
+        <span class="approval-line__screen" dir="ltr">
           <span>{S.sheet.approval}</span>
           <input
             class="approval-line__input"
@@ -530,8 +539,8 @@ interface TailBlockProps {
             onInput={(e) => actions.setApprover((e.currentTarget as HTMLInputElement).value)}
           />
         </span>
-        <span class="approval-line__date" dir="ltr">
-          {currentDate}
+        <span class="approval-line__print" dir="ltr">
+          {S.sheet.approval}{quotation.approver}
         </span>
       </div>
     </div>

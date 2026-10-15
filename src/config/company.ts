@@ -42,7 +42,7 @@ export const companyDefaults: CompanyConfig = {
   defaultNotes: ["السعر: غيرشامل الضريبة."],
   defaultApprover: "تسنيم",
   thankYou: "ولكم جزيل الشكر",
-  logo: "assets/logo.png",
+  logo: "assets/logo.svg",
 };
 
 export function defaultPhones(): Phone[] {

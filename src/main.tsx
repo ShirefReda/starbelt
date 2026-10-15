@@ -5,6 +5,7 @@ import "./styles/sheet.css";
 import "./styles/print.css";
 import { App } from "./app";
 
+document.body.classList.add("is-editing");
 const root = document.getElementById("app");
 if (root) render(<App />, root);
 

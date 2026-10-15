@@ -5,3 +5,4 @@ coverage
 .DS_Store
 deployment-*.txt
 *-all-logs-*.txt
+out/
