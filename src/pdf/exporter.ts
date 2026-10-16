@@ -77,6 +77,8 @@ ${stylesHtml}
   }
   body.is-editing .client-line__input, body.is-editing .approval-line__input { border:none !important; }
   /* Print-only vs screen-only toggles */
+  .cell-screen { display:none !important; }
+  .cell-print { display:block !important; }
   .client-line__screen { display:none !important; }
   .client-line__print { display:inline !important; }
   .note-row .note-editor { display:none !important; }
@@ -286,6 +288,22 @@ export async function exportPdfViaRaster(
     const prevTransform = scaleEl?.style.transform ?? "";
     if (scaleEl) scaleEl.style.transform = "none";
 
+    const body = document.body;
+    const wasEditing = body.classList.contains("is-editing");
+    body.classList.remove("is-editing");
+    body.classList.add("is-exporting");
+
+    if (document.fonts?.ready) {
+      try {
+        await document.fonts.ready;
+      } catch {
+        /* ignore */
+      }
+    }
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
+
     // Create warning banner elements that will be visible in the capture.
     const banners: HTMLElement[] = [];
     for (const page of pages) {
@@ -302,12 +320,6 @@ export async function exportPdfViaRaster(
       banners.push(b);
     }
 
-    // Hide all editing helpers before capture so they never appear in the raster fallback.
-    const hiddenEls: Array<{ el: HTMLElement; prev: string }> = [];
-    for (const el of Array.from(document.querySelectorAll<HTMLElement>(".no-print, .row-actions, .table-editor-actions, .autocomplete, .sheet-measure"))) {
-      hiddenEls.push({ el, prev: el.style.display });
-      el.style.display = "none";
-    }
     try {
       for (let i = 0; i < pages.length; i++) {
         const canvas = await html2canvas(pages[i]!, {
@@ -315,15 +327,23 @@ export async function exportPdfViaRaster(
           backgroundColor: "#ffffff",
           useCORS: true,
           logging: false,
+          onclone: (clonedDoc) => {
+            clonedDoc.body.classList.add("is-exporting");
+            clonedDoc.body.classList.remove("is-editing");
+            const clonedScale = clonedDoc.querySelector<HTMLElement>(".sheet-scale");
+            if (clonedScale) clonedScale.style.transform = "none";
+          },
         });
         if (i > 0) pdf.addPage();
         const img = canvas.toDataURL("image/png");
         pdf.addImage(img, "PNG", 0, 0, 210, 297);
       }
     } finally {
-      for (const { el, prev } of hiddenEls) el.style.display = prev;
       for (const b of banners) b.remove();
+      body.classList.remove("is-exporting");
+      if (wasEditing) body.classList.add("is-editing");
       if (scaleEl) scaleEl.style.transform = prevTransform;
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     }
 
     const fileName = safeFileName(quotationFileName(quotation));

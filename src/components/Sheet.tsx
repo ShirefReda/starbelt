@@ -453,43 +453,54 @@ function ItemRow({ item, index, itemNames }: ItemRowProps) {
         </div>
       </td>
       <td class="cell-item">
-        <ItemNameInput
-          class="item-editor"
-          value={item.name}
-          names={itemNames}
-          ariaLabel={S.sheet.colItem}
-          dataRow={index}
-          dataCell="item"
-          onChange={(v) => actions.setItemName(item.id, v)}
-          onCommit={(v) => actions.rememberItemName(v)}
-          onEnter={() => enter("qty")}
-        />
+        <span class="cell-screen">
+          <ItemNameInput
+            class="item-editor"
+            value={item.name}
+            names={itemNames}
+            ariaLabel={S.sheet.colItem}
+            dataRow={index}
+            dataCell="item"
+            onChange={(v) => actions.setItemName(item.id, v)}
+            onCommit={(v) => actions.rememberItemName(v)}
+            onEnter={() => enter("qty")}
+          />
+        </span>
+        <span class="cell-print" dir="rtl">
+          <bdi>{item.name || "‏"}</bdi>
+        </span>
       </td>
       <td class="cell-qty">
-        <NumericInput
-          className="number-cell-input"
-          value={item.qty}
-          ariaLabel={S.sheet.colQty}
-          dataRow={index}
-          dataCell="qty"
-          onValue={(n) => actions.setItemQty(item.id, n)}
-          onEnter={() => enter("price")}
-        />
+        <span class="cell-screen">
+          <NumericInput
+            className="number-cell-input"
+            value={item.qty}
+            ariaLabel={S.sheet.colQty}
+            dataRow={index}
+            dataCell="qty"
+            onValue={(n) => actions.setItemQty(item.id, n)}
+            onEnter={() => enter("price")}
+          />
+        </span>
+        <span class="cell-print">{formatInt(item.qty)}</span>
       </td>
       <td class="cell-price">
-        <NumericInput
-          className="number-cell-input"
-          value={item.price}
-          ariaLabel={S.sheet.colPrice}
-          dataRow={index}
-          dataCell="price"
-          onValue={(n) => actions.setItemPrice(item.id, n)}
-          onEnter={() => {
-            const isLast = index === store.get().quotation.items.length - 1;
-            if (isLast) actions.addItem();
-            requestFocus({ row: index + 1, cell: "item" });
-          }}
-        />
+        <span class="cell-screen">
+          <NumericInput
+            className="number-cell-input"
+            value={item.price}
+            ariaLabel={S.sheet.colPrice}
+            dataRow={index}
+            dataCell="price"
+            onValue={(n) => actions.setItemPrice(item.id, n)}
+            onEnter={() => {
+              const isLast = index === store.get().quotation.items.length - 1;
+              if (isLast) actions.addItem();
+              requestFocus({ row: index + 1, cell: "item" });
+            }}
+          />
+        </span>
+        <span class="cell-print">{formatMoney(item.price)}</span>
       </td>
       <td class="cell-total">{formatMoney(lineTotal(item))}</td>
     </tr>
