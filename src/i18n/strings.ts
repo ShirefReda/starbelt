@@ -26,6 +26,10 @@ export const S = {
   sheet: {
     clientPrefix: "شركه / ",
     clientPlaceholder: "اسم الشركة / العميل",
+    attentionPrefix: "عناية / ",
+    attentionPlaceholder: "اسم الشخص / المسؤول",
+    addAttention: "+ عناية",
+    deleteAttention: "حذف سطر العناية",
     colIndex: "م",
     colItem: "أسم الصنف",
     colQty: "عدد",

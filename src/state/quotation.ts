@@ -43,6 +43,7 @@ export interface Quotation {
   createdAt: string; // ISO date-time
   updatedAt: string; // ISO date-time
   client: string;
+  attention?: string;
   items: QuoteItem[];
   notes: QuoteNote[];
   approver: string;
@@ -108,6 +109,7 @@ export function migrateQuotation(raw: unknown): Quotation | null {
     createdAt: typeof r.createdAt === "string" ? r.createdAt : base.createdAt,
     updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : base.updatedAt,
     client: typeof r.client === "string" ? r.client : "",
+    attention: typeof r.attention === "string" ? r.attention : undefined,
     items: Array.isArray(r.items) ? r.items.filter(isQuoteItem) : [],
     notes: Array.isArray(r.notes) ? r.notes.filter(isQuoteNote) : [],
     approver: typeof r.approver === "string" ? r.approver : "",

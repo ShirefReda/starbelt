@@ -151,6 +151,12 @@
   font-size: 22px;
   font-weight: 800;
   color: #000;
+  padding-bottom: 1.5mm;
+  margin-bottom: 1.5mm;
+  min-height: 8mm;
+}
+
+.client-line:last-of-type {
   padding-bottom: 3mm;
   margin-bottom: 3mm;
   min-height: 11mm;
@@ -159,6 +165,7 @@
 .client-line__prefix {
   font-size: inherit;
   color: inherit;
+  flex: none;
 }
 
 .client-line__input {
@@ -178,7 +185,7 @@
 .client-line__screen {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 8px;
   flex: 1;
 }
 .client-line__text {
@@ -186,12 +193,36 @@
   display: inline-flex;
   align-items: center;
   gap: 0;
+  flex: 1;
 }
 .client-line__print {
   display: none;
   unicode-bidi: plaintext;
   padding-bottom: 1px;
 }
+
+.btn--add-attn {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+  border: 1px dashed var(--border);
+  background: transparent;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  flex: none;
+  cursor: pointer;
+  transition: all var(--duration-fast, 0.15s);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn--add-attn:hover {
+  background: var(--surface-2);
+  border-color: var(--navy);
+  color: var(--navy-700);
+}
+
 @media print {
   .client-line__screen { display: none !important; }
   .client-line__print { display: inline !important; }

@@ -65,6 +65,9 @@ export function quotationFileName(q: Quotation): string {
 
 export interface SheetActions {
   setClient(value: string): void;
+  setAttention(value: string): void;
+  addAttention(): void;
+  removeAttention(): void;
   setApprover(value: string): void;
   setThankYou(value: string): void;
   setItemName(id: string, value: string): void;
@@ -89,6 +92,15 @@ export interface SheetActions {
 export const actions: SheetActions = {
   setClient(value) {
     store.commit((d) => void (d.client = value), { field: "client" });
+  },
+  setAttention(value) {
+    store.commit((d) => void (d.attention = value), { field: "attention" });
+  },
+  addAttention() {
+    store.commit((d) => void (d.attention = ""), { clearsRedo: true });
+  },
+  removeAttention() {
+    store.commit((d) => void (delete d.attention), { clearsRedo: true });
   },
   setApprover(value) {
     store.commit((d) => void (d.approver = value), { field: "approver" });

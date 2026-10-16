@@ -106,6 +106,7 @@ export function Sheet({ state, zoom }: SheetProps) {
     quotation.items,
     quotation.notes,
     quotation.client,
+    quotation.attention,
     quotation.approver,
     quotation.thankYou,
     options,
@@ -128,6 +129,12 @@ export function Sheet({ state, zoom }: SheetProps) {
             <span class="client-line__prefix">{S.sheet.clientPrefix}</span>
             <span>{quotation.client || S.sheet.clientPlaceholder}</span>
           </div>
+          {quotation.attention !== undefined && (
+            <div class="client-line attention-line">
+              <span class="client-line__prefix">{S.sheet.attentionPrefix}</span>
+              <span>{quotation.attention || S.sheet.attentionPlaceholder}</span>
+            </div>
+          )}
         </div>
         <table class="table-wrap" style={{ width: `${CONTENT_W}px` }}>
           <thead>
@@ -284,18 +291,61 @@ function SheetPage({
                     onInput={(e) => actions.setClient((e.currentTarget as HTMLInputElement).value)}
                   />
                 </span>
+                {quotation.attention === undefined && (
+                  <button
+                    type="button"
+                    class="btn btn--add-attn no-print"
+                    onClick={() => actions.addAttention()}
+                    title={S.sheet.addAttention}
+                  >
+                    {S.sheet.addAttention}
+                  </button>
+                )}
               </span>
               {/* Print: static bidi-isolated text */}
               <span class="client-line__print" dir="rtl">
                 <bdi>{S.sheet.clientPrefix}{quotation.client || S.sheet.clientPlaceholder}</bdi>
               </span>
             </div>
+            {quotation.attention !== undefined && (
+              <div class="client-line attention-line">
+                {/* Screen: editable input */}
+                <span class="client-line__screen" dir="rtl">
+                  <span class="client-line__text">
+                    <span class="client-line__prefix">{S.sheet.attentionPrefix}</span>
+                    <input
+                      class="client-line__input"
+                      type="text"
+                      value={quotation.attention}
+                      placeholder={S.sheet.attentionPlaceholder}
+                      aria-label={S.sheet.attentionPlaceholder}
+                      autoFocus
+                      onInput={(e) => actions.setAttention((e.currentTarget as HTMLInputElement).value)}
+                    />
+                  </span>
+                  <button
+                    type="button"
+                    class="row-btn no-print"
+                    title={S.sheet.deleteAttention}
+                    aria-label={S.sheet.deleteAttention}
+                    onClick={() => actions.removeAttention()}
+                  >
+                    <IconTrash />
+                  </button>
+                </span>
+                {/* Print: static bidi-isolated text */}
+                <span class="client-line__print" dir="rtl">
+                  <bdi>{S.sheet.attentionPrefix}{quotation.attention || S.sheet.attentionPlaceholder}</bdi>
+                </span>
+              </div>
+            )}
           </>
         ) : (
           <div class="doc-meta page-cont-meta">
             <span>
               {S.sheet.clientPrefix}
               {quotation.client}
+              {quotation.attention ? ` — ${S.sheet.attentionPrefix}${quotation.attention}` : ""}
             </span>
             <span>{t(S.sheet.pageXofY, { x: pageIndex + 1, y: pageCount })}</span>
           </div>
