@@ -286,8 +286,8 @@ body.is-editing .client-line__input:focus {
 
 .cell-item {
   text-align: right;
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 25px;
+  font-weight: 400;
   color: #000;
   padding-block: 0 !important;
 }
@@ -296,8 +296,8 @@ body.is-editing .client-line__input:focus {
   width: 100%;
   min-height: 8mm;
   font-family: inherit;
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 25px;
+  font-weight: 400;
   color: inherit;
   background: transparent;
   border: 0;
@@ -354,8 +354,8 @@ body.is-editing .client-line__input:focus {
   width: 100%;
   min-height: 8mm;
   font-family: inherit;
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 25px;
+  font-weight: 400;
   color: #000;
   padding: 1.2mm 0;
   text-align: right;
