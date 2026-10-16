@@ -107,6 +107,7 @@ export function Sheet({ state, zoom }: SheetProps) {
     quotation.notes,
     quotation.client,
     quotation.attention,
+    quotation.date,
     quotation.approver,
     quotation.thankYou,
     options,
@@ -116,6 +117,7 @@ export function Sheet({ state, zoom }: SheetProps) {
 
   const pages = useMemo(() => buildPages(quotation, breaks), [quotation, breaks]);
   const pageCount = Math.max(1, pages.length);
+  const currentDate = quotation.date || displayDate(new Date(quotation.createdAt || Date.now()));
 
   return (
     <>
@@ -125,16 +127,24 @@ export function Sheet({ state, zoom }: SheetProps) {
           <div class="doc-title">بيان سعر</div>
         </div>
         <div data-measure-client style={{ width: `${CONTENT_W}px` }}>
-          <div class="client-line">
-            <span class="client-line__prefix">{S.sheet.clientPrefix}</span>
-            <span>{quotation.client || S.sheet.clientPlaceholder}</span>
-          </div>
-          {quotation.attention !== undefined && (
-            <div class="client-line attention-line">
-              <span class="client-line__prefix">{S.sheet.attentionPrefix}</span>
-              <span>{quotation.attention || S.sheet.attentionPlaceholder}</span>
+          <div class="client-date-row">
+            <div class="client-lines">
+              <div class="client-line">
+                <span class="client-line__prefix">{S.sheet.clientPrefix}</span>
+                <span>{quotation.client || S.sheet.clientPlaceholder}</span>
+              </div>
+              {quotation.attention !== undefined && (
+                <div class="client-line attention-line">
+                  <span class="client-line__prefix">{S.sheet.attentionPrefix}</span>
+                  <span>{quotation.attention || S.sheet.attentionPlaceholder}</span>
+                </div>
+              )}
             </div>
-          )}
+            <div class="date-line">
+              <span class="date-line__prefix">{S.sheet.datePrefix}</span>
+              <span>{currentDate}</span>
+            </div>
+          </div>
         </div>
         <table class="table-wrap" style={{ width: `${CONTENT_W}px` }}>
           <thead>
@@ -235,6 +245,7 @@ function SheetPage({
   const options = quotation.options;
   const isFirst = pageIndex === 0;
   const { items, startIndex, showTail } = page;
+  const currentDate = quotation.date || displayDate(new Date(quotation.createdAt || Date.now()));
 
   return (
     <div class="sheet-page" data-page={pageIndex}>
@@ -273,72 +284,96 @@ function SheetPage({
                   {S.options.quotationNumber}: {quotation.number}
                 </span>
                 <span>
-                  {S.options.date}: {displayDate(new Date(quotation.createdAt))}
+                  {S.options.date}: {currentDate}
                 </span>
               </div>
             )}
-            <div class="client-line">
-              {/* Screen: editable input */}
-              <span class="client-line__screen" dir="rtl">
-                <span class="client-line__text">
-                  <span class="client-line__prefix">{S.sheet.clientPrefix}</span>
+            <div class="client-date-row">
+              <div class="client-lines">
+                <div class="client-line">
+                  {/* Screen: editable input */}
+                  <span class="client-line__screen" dir="rtl">
+                    <span class="client-line__text">
+                      <span class="client-line__prefix">{S.sheet.clientPrefix}</span>
+                      <input
+                        class="client-line__input"
+                        type="text"
+                        value={quotation.client}
+                        placeholder={S.sheet.clientPlaceholder}
+                        aria-label={S.sheet.clientPlaceholder}
+                        onInput={(e) => actions.setClient((e.currentTarget as HTMLInputElement).value)}
+                      />
+                    </span>
+                    {quotation.attention === undefined && (
+                      <button
+                        type="button"
+                        class="btn btn--add-attn no-print"
+                        onClick={() => actions.addAttention()}
+                        title={S.sheet.addAttention}
+                      >
+                        {S.sheet.addAttention}
+                      </button>
+                    )}
+                  </span>
+                  {/* Print: static bidi-isolated text */}
+                  <span class="client-line__print" dir="rtl">
+                    <bdi>{S.sheet.clientPrefix}{quotation.client || S.sheet.clientPlaceholder}</bdi>
+                  </span>
+                </div>
+                {quotation.attention !== undefined && (
+                  <div class="client-line attention-line">
+                    {/* Screen: editable input */}
+                    <span class="client-line__screen" dir="rtl">
+                      <span class="client-line__text">
+                        <span class="client-line__prefix">{S.sheet.attentionPrefix}</span>
+                        <input
+                          class="client-line__input"
+                          type="text"
+                          value={quotation.attention}
+                          placeholder={S.sheet.attentionPlaceholder}
+                          aria-label={S.sheet.attentionPlaceholder}
+                          autoFocus
+                          onInput={(e) => actions.setAttention((e.currentTarget as HTMLInputElement).value)}
+                        />
+                      </span>
+                      <button
+                        type="button"
+                        class="row-btn no-print"
+                        title={S.sheet.deleteAttention}
+                        aria-label={S.sheet.deleteAttention}
+                        onClick={() => actions.removeAttention()}
+                      >
+                        <IconTrash />
+                      </button>
+                    </span>
+                    {/* Print: static bidi-isolated text */}
+                    <span class="client-line__print" dir="rtl">
+                      <bdi>{S.sheet.attentionPrefix}{quotation.attention || S.sheet.attentionPlaceholder}</bdi>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div class="date-line">
+                {/* Screen: editable input */}
+                <span class="date-line__screen" dir="rtl">
+                  <span class="date-line__prefix">{S.sheet.datePrefix}</span>
                   <input
-                    class="client-line__input"
+                    class="date-line__input"
                     type="text"
-                    value={quotation.client}
-                    placeholder={S.sheet.clientPlaceholder}
-                    aria-label={S.sheet.clientPlaceholder}
-                    onInput={(e) => actions.setClient((e.currentTarget as HTMLInputElement).value)}
+                    value={currentDate}
+                    placeholder={S.sheet.datePlaceholder}
+                    aria-label={S.sheet.datePlaceholder}
+                    onInput={(e) => actions.setDate((e.currentTarget as HTMLInputElement).value)}
                   />
                 </span>
-                {quotation.attention === undefined && (
-                  <button
-                    type="button"
-                    class="btn btn--add-attn no-print"
-                    onClick={() => actions.addAttention()}
-                    title={S.sheet.addAttention}
-                  >
-                    {S.sheet.addAttention}
-                  </button>
-                )}
-              </span>
-              {/* Print: static bidi-isolated text */}
-              <span class="client-line__print" dir="rtl">
-                <bdi>{S.sheet.clientPrefix}{quotation.client || S.sheet.clientPlaceholder}</bdi>
-              </span>
-            </div>
-            {quotation.attention !== undefined && (
-              <div class="client-line attention-line">
-                {/* Screen: editable input */}
-                <span class="client-line__screen" dir="rtl">
-                  <span class="client-line__text">
-                    <span class="client-line__prefix">{S.sheet.attentionPrefix}</span>
-                    <input
-                      class="client-line__input"
-                      type="text"
-                      value={quotation.attention}
-                      placeholder={S.sheet.attentionPlaceholder}
-                      aria-label={S.sheet.attentionPlaceholder}
-                      autoFocus
-                      onInput={(e) => actions.setAttention((e.currentTarget as HTMLInputElement).value)}
-                    />
-                  </span>
-                  <button
-                    type="button"
-                    class="row-btn no-print"
-                    title={S.sheet.deleteAttention}
-                    aria-label={S.sheet.deleteAttention}
-                    onClick={() => actions.removeAttention()}
-                  >
-                    <IconTrash />
-                  </button>
-                </span>
                 {/* Print: static bidi-isolated text */}
-                <span class="client-line__print" dir="rtl">
-                  <bdi>{S.sheet.attentionPrefix}{quotation.attention || S.sheet.attentionPlaceholder}</bdi>
+                <span class="date-line__print" dir="rtl">
+                  <span class="date-line__prefix">{S.sheet.datePrefix}</span>
+                  <bdi dir="ltr">{currentDate}</bdi>
                 </span>
               </div>
-            )}
+            </div>
           </>
         ) : (
           <div class="doc-meta page-cont-meta">

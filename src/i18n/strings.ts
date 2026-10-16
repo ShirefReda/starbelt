@@ -30,6 +30,8 @@ export const S = {
     attentionPlaceholder: "اسم الشخص / المسؤول",
     addAttention: "+ عناية",
     deleteAttention: "حذف سطر العناية",
+    datePrefix: "التاريخ : ",
+    datePlaceholder: "التاريخ",
     colIndex: "م",
     colItem: "أسم الصنف",
     colQty: "عدد",

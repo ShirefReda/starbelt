@@ -75,12 +75,14 @@ ${stylesHtml}
     border:none !important; background:transparent !important; box-shadow:none !important; outline:none !important;
     -webkit-appearance:none; appearance:none;
   }
-  body.is-editing .client-line__input, body.is-editing .approval-line__input { border:none !important; }
+  body.is-editing .client-line__input, body.is-editing .date-line__input, body.is-editing .approval-line__input { border:none !important; }
   /* Print-only vs screen-only toggles */
   .cell-screen { display:none !important; }
   .cell-print { display:block !important; }
   .client-line__screen { display:none !important; }
   .client-line__print { display:inline !important; }
+  .date-line__screen { display:none !important; }
+  .date-line__print { display:inline !important; }
   .note-row .note-editor { display:none !important; }
   .note-editor__print { display:block !important; }
   .thanks-field--screen { display:none !important; }

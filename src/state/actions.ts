@@ -8,7 +8,7 @@ import { Store } from "./store";
 import { SCHEMA_VERSION, emptyQuotation, type AppState, type Quotation } from "./quotation";
 import { mergeCompany } from "../config/companyMerge";
 import { LocalStorageQuotationRepository } from "../storage/localStorageRepository";
-import { uid, localISODate } from "../utils/id";
+import { uid, localISODate, displayDate } from "../utils/id";
 
 export const repo = new LocalStorageQuotationRepository();
 
@@ -35,6 +35,7 @@ function makeFreshQuotation(): Quotation {
     number: repo.nextQuotationNumber(now.getFullYear()),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
+    date: displayDate(now),
     items: [{ id: uid("it"), name: "", qty: 1, price: 0 }],
     notes: company.defaultNotes.map((text) => ({ id: uid("n"), text })),
     approver: company.defaultApprover,
@@ -65,6 +66,7 @@ export function quotationFileName(q: Quotation): string {
 
 export interface SheetActions {
   setClient(value: string): void;
+  setDate(value: string): void;
   setAttention(value: string): void;
   addAttention(): void;
   removeAttention(): void;
@@ -92,6 +94,9 @@ export interface SheetActions {
 export const actions: SheetActions = {
   setClient(value) {
     store.commit((d) => void (d.client = value), { field: "client" });
+  },
+  setDate(value) {
+    store.commit((d) => void (d.date = value), { field: "date" });
   },
   setAttention(value) {
     store.commit((d) => void (d.attention = value), { field: "attention" });
@@ -210,26 +215,28 @@ export const actions: SheetActions = {
   },
   duplicateQuotation() {
     const current = store.get().quotation;
-    const now = new Date().toISOString();
+    const now = new Date();
     const copy: Quotation = {
       ...cloneQuotation(current),
       id: uid("q"),
-      number: repo.nextQuotationNumber(new Date().getFullYear()),
-      createdAt: now,
-      updatedAt: now,
+      number: repo.nextQuotationNumber(now.getFullYear()),
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      date: displayDate(now),
     };
     store.replace({ ...store.get(), quotation: copy });
   },
   clearQuotation() {
-    const now = new Date().toISOString();
+    const now = new Date();
     store.replace({
       ...store.get(),
       quotation: {
         ...makeFreshQuotation(),
         id: uid("q"),
-        number: repo.nextQuotationNumber(new Date().getFullYear()),
-        createdAt: now,
-        updatedAt: now,
+        number: repo.nextQuotationNumber(now.getFullYear()),
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        date: displayDate(now),
         client: "",
       },
     });

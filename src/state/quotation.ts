@@ -6,6 +6,7 @@
  */
 
 import type { CompanyConfig } from "../config/company";
+import { displayDate } from "../utils/id";
 
 export interface QuoteItem {
   id: string;
@@ -42,6 +43,7 @@ export interface Quotation {
   number: string;
   createdAt: string; // ISO date-time
   updatedAt: string; // ISO date-time
+  date?: string; // formatted date string (DD/MM/YYYY)
   client: string;
   attention?: string;
   items: QuoteItem[];
@@ -78,6 +80,7 @@ export const emptyQuotation = (): Quotation => ({
   number: "",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
+  date: displayDate(new Date()),
   client: "",
   items: [],
   notes: [],
@@ -108,6 +111,7 @@ export function migrateQuotation(raw: unknown): Quotation | null {
     number: typeof r.number === "string" ? r.number : "",
     createdAt: typeof r.createdAt === "string" ? r.createdAt : base.createdAt,
     updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : base.updatedAt,
+    date: typeof r.date === "string" ? r.date : (r.createdAt ? displayDate(new Date(r.createdAt)) : base.date),
     client: typeof r.client === "string" ? r.client : "",
     attention: typeof r.attention === "string" ? r.attention : undefined,
     items: Array.isArray(r.items) ? r.items.filter(isQuoteItem) : [],
