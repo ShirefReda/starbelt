@@ -77,7 +77,7 @@ export function Toolbar({
           <IconNew />
           <span class="btn__label">{S.toolbar.newQuotation}</span>
         </button>
-        <button type="button" class="btn" onClick={onAddItem} title={S.toolbar.addItem}>
+        <button type="button" class="btn btn--add-item" onClick={onAddItem} title={S.toolbar.addItem}>
           <IconAdd />
           <span class="btn__label">{S.toolbar.addItem}</span>
         </button>

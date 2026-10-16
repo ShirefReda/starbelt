@@ -202,12 +202,33 @@ body {
 }
 
 .btn--danger {
-  color: var(--danger);
+  color: #c0392b;
+  background: #fff5f5;
+  border-color: #e5877f;
 }
 
 .btn--danger:hover {
-  background: var(--danger-bg);
-  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: #c0392b;
+  color: #ffffff;
+  border-color: #c0392b;
+  box-shadow: 0 3px 8px rgba(192, 57, 43, 0.35);
+}
+
+.btn--add-item {
+  background: #eef6fd;
+  border-color: #1a6fb0;
+  color: #0b4572;
+  font-weight: 800;
+}
+
+.btn--add-item:hover {
+  background: #125b94;
+  border-color: #125b94;
+  color: #ffffff;
+}
+
+.btn--add-item svg {
+  stroke-width: 2.5;
 }
 
 .btn--icon {
