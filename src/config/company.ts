@@ -38,7 +38,7 @@ export const companyDefaults: CompanyConfig = {
   commercialRegisterLabel: "سجل تجارى",
   address: "العاشر من رمضان قطعة A6 بجوار الصوامع",
   email: "starbelt86@gmail.com",
-  phones: [{ value: "01011074556" }, { value: "01118274448" }, { value: "01227156258" }],
+  phones: [{ value: "01011074556" }, { value: "01227156258" }],
   defaultNotes: ["السعر: غيرشامل الضريبة."],
   defaultApprover: "تسنيم",
   thankYou: "ولكم جزيل الشكر",

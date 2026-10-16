@@ -19,8 +19,8 @@ function asPhones(v: unknown, fallback: Phone[]): Phone[] {
   if (!Array.isArray(v)) return fallback;
   const out: Phone[] = [];
   for (const entry of v) {
-    if (typeof entry === "string") out.push({ value: entry });
-    else if (isRecord(entry) && typeof entry.value === "string") {
+    if (typeof entry === "string" && entry !== "01118274448") out.push({ value: entry });
+    else if (isRecord(entry) && typeof entry.value === "string" && entry.value !== "01118274448") {
       out.push({
         value: entry.value,
         label: typeof entry.label === "string" ? entry.label : undefined,

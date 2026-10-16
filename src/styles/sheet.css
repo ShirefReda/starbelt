@@ -758,10 +758,10 @@ body.is-editing .approval-line__input:focus {
 }
 
 .footer-address {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   color: #000;
-  max-width: 85mm;
+  max-width: 90mm;
   text-align: right;
   line-height: 1.5;
 }
@@ -769,10 +769,10 @@ body.is-editing .approval-line__input:focus {
 .footer-contact {
   direction: ltr;
   text-align: left;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   color: #000;
-  line-height: 1.7;
+  line-height: 1.6;
   font-family: "Segoe UI", Tahoma, sans-serif;
 }
 
