@@ -286,18 +286,18 @@ body.is-editing .client-line__input:focus {
 
 .cell-item {
   text-align: right;
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
   color: #000;
   padding-block: 0 !important;
 }
 
 .item-editor {
   width: 100%;
-  min-height: 7mm;
+  min-height: 8mm;
   font-family: inherit;
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
   color: inherit;
   background: transparent;
   border: 0;
@@ -352,10 +352,10 @@ body.is-editing .client-line__input:focus {
 }
 .cell-item .cell-print {
   width: 100%;
-  min-height: 7mm;
+  min-height: 8mm;
   font-family: inherit;
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
   color: #000;
   padding: 1.2mm 0;
   text-align: right;
