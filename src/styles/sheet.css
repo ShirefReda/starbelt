@@ -368,7 +368,7 @@ body.is-editing .client-line__input:focus {
   font-family: inherit;
   font-size: 18px;
   font-weight: 800;
-  color: #1f6b99;
+  color: #000;
   background: transparent;
   border: 0;
   outline: none;
@@ -383,7 +383,7 @@ body.is-editing .client-line__input:focus {
   display: none;
   font-size: 18px;
   font-weight: 800;
-  color: #1f6b99;
+  color: #000;
   text-align: right;
   unicode-bidi: plaintext;
   flex: 1;
