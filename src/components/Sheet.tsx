@@ -523,11 +523,49 @@ function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
         )}
         {options.showVat && (
           <>
-            <TotalsRow label={S.options.subTotalLabel} value={formatMoney(totals.taxableBase)} />
-            <TotalsRow label={S.options.vatLabel} value={formatMoney(totals.vatAmount)} />
+            {options.showDiscount && (
+              <TotalsRow label={S.options.subTotalLabel} value={formatMoney(totals.taxableBase)} />
+            )}
+            <TotalsRow
+              label={S.options.vatLabel}
+              value={formatMoney(totals.vatAmount)}
+              action={
+                !measuring && (
+                  <button
+                    type="button"
+                    class="row-btn no-print"
+                    title="حذف الضريبة"
+                    aria-label="حذف الضريبة"
+                    onClick={() => actions.setOption("showVat", false)}
+                  >
+                    <IconTrash />
+                  </button>
+                )
+              }
+            />
           </>
         )}
-        <TotalsRow label={S.options.totalLabel} value={formatMoney(totals.total)} grand />
+        <TotalsRow
+          label={S.options.totalLabel}
+          value={formatMoney(totals.total)}
+          grand
+          action={
+            !measuring &&
+            !options.showVat && (
+              <button
+                type="button"
+                class="btn btn--add-vat no-print"
+                onClick={() => {
+                  actions.setOption("vatRate", 14);
+                  actions.setOption("showVat", true);
+                }}
+                title="إضافة ضريبة 14%"
+              >
+                +14%
+              </button>
+            )
+          }
+        />
       </div>
 
       {options.showWords && (
@@ -609,7 +647,14 @@ function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
   );
 }
 
-function TotalsRow({ label, value, grand }: { label: string; value: string; grand?: boolean }) {
+interface TotalsRowProps {
+  label: string;
+  value: string;
+  grand?: boolean;
+  action?: preact.ComponentChildren;
+}
+
+function TotalsRow({ label, value, grand, action }: TotalsRowProps) {
   return (
     <table class="table-wrap">
       <colgroup>
@@ -622,7 +667,12 @@ function TotalsRow({ label, value, grand }: { label: string; value: string; gran
       <tbody>
         <tr class={grand ? "trow-grand" : "trow-subtotal"}>
           <td class="cell-num" />
-          <td class="trow-label">{label}</td>
+          <td class="trow-label">
+            <span class="trow-label__inner">
+              <span>{label}</span>
+              {action}
+            </span>
+          </td>
           <td />
           <td />
           <td class="cell-total">{value}</td>

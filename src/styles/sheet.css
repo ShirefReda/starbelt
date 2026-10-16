@@ -415,6 +415,7 @@ body.is-exporting .table-editor-actions,
 body.is-exporting .autocomplete,
 body.is-exporting .sheet-measure,
 body.is-exporting .btn--add-attn,
+body.is-exporting .btn--add-vat,
 body.is-exporting .row-btn {
   display: none !important;
 }
@@ -441,6 +442,37 @@ body.is-exporting .approval-line__input {
   text-align: center !important;
   font-size: 20px;
   font-weight: 900;
+}
+
+.trow-label__inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn--add-vat {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+  border: 1px dashed var(--border);
+  background: transparent;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  flex: none;
+  cursor: pointer;
+  transition: all var(--duration-fast, 0.15s);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+.btn--add-vat:hover {
+  background: var(--surface-2);
+  border-color: var(--navy);
+  color: var(--navy-700);
 }
 
 /* ---- Tail block: notes, words, thanks, approval ------------------------- */
