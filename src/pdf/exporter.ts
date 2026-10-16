@@ -81,6 +81,8 @@ ${stylesHtml}
   .client-line__print { display:inline !important; }
   .note-row .note-editor { display:none !important; }
   .note-editor__print { display:block !important; }
+  .thanks-field--screen { display:none !important; }
+  .thanks-field--print { display:block !important; }
   .approval-line__screen { display:none !important; }
   .approval-line__print { display:inline !important; }
   /* Force exact colours */
@@ -300,6 +302,12 @@ export async function exportPdfViaRaster(
       banners.push(b);
     }
 
+    // Hide all editing helpers before capture so they never appear in the raster fallback.
+    const hiddenEls: Array<{ el: HTMLElement; prev: string }> = [];
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>(".no-print, .row-actions, .table-editor-actions, .autocomplete, .sheet-measure"))) {
+      hiddenEls.push({ el, prev: el.style.display });
+      el.style.display = "none";
+    }
     try {
       for (let i = 0; i < pages.length; i++) {
         const canvas = await html2canvas(pages[i]!, {
@@ -313,6 +321,7 @@ export async function exportPdfViaRaster(
         pdf.addImage(img, "PNG", 0, 0, 210, 297);
       }
     } finally {
+      for (const { el, prev } of hiddenEls) el.style.display = prev;
       for (const b of banners) b.remove();
       if (scaleEl) scaleEl.style.transform = prevTransform;
     }

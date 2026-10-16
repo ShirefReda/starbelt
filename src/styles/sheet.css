@@ -153,10 +153,6 @@
   font-size: 22px;
   font-weight: 800;
   color: #1f6b99;
-  text-decoration: underline;
-  text-decoration-color: #1f6b99;
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 4px;
   padding-bottom: 3mm;
   margin-bottom: 3mm;
   min-height: 11mm;
@@ -187,9 +183,18 @@
   gap: 0;
   flex: 1;
 }
+.client-line__text {
+  border-bottom: 1.5px solid #1f6b99;
+  padding-bottom: 1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
 .client-line__print {
   display: none;
   unicode-bidi: plaintext;
+  border-bottom: 1.5px solid #1f6b99;
+  padding-bottom: 1px;
 }
 @media print {
   .client-line__screen { display: none !important; }
@@ -368,7 +373,7 @@ body.is-editing .client-line__input:focus {
   font-family: inherit;
   font-size: 18px;
   font-weight: 800;
-  color: #000;
+  color: #1f6b99;
   background: transparent;
   border: 0;
   outline: none;
@@ -383,7 +388,7 @@ body.is-editing .client-line__input:focus {
   display: none;
   font-size: 18px;
   font-weight: 800;
-  color: #000;
+  color: #1f6b99;
   text-align: right;
   unicode-bidi: plaintext;
   flex: 1;
@@ -439,6 +444,21 @@ body.is-editing .client-line__input:focus {
   flex-shrink: 0;
   display: block;
 }
+.thanks-field--print { display: none !important; }
+.thanks-field--screen { display: block !important; }
+@media print {
+  .thanks-field--screen { display: none !important; }
+  .thanks-field--print {
+    display: block !important;
+    font-family: "Amiri", serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: #0d2440;
+    text-align: center;
+    min-height: 12mm;
+    padding: 2mm 0;
+  }
+}
 
 .approval-line {
   font-size: 16px;
@@ -450,25 +470,23 @@ body.is-editing .client-line__input:focus {
   justify-content: flex-start;
   text-align: left;
   direction: ltr;
+  margin-inline-end: auto;
+  align-self: flex-start;
 }
 
 .approval-line__left {
   display: flex;
   align-items: center;
   gap: 2mm;
-  direction: ltr;
+  direction: rtl;
 }
 
 .approval-line__date {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  white-space: nowrap;
-  direction: ltr;
+  display: none !important;
 }
 
 .approval-line__screen { display: flex; align-items: center; gap: 2mm; }
-.approval-line__print { display: none; font-size: 16px; font-weight: 800; color: #000; direction: ltr; }
+.approval-line__print { display: none; font-size: 16px; font-weight: 800; color: #000; direction: rtl; unicode-bidi: plaintext; text-align: right; }
 @media print {
   .approval-line__screen { display: none !important; }
   .approval-line__print { display: inline !important; }

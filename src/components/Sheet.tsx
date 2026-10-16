@@ -273,15 +273,17 @@ function SheetPage({
             <div class="client-line">
               {/* Screen: editable input */}
               <span class="client-line__screen" dir="rtl">
-                <span class="client-line__prefix">{S.sheet.clientPrefix}</span>
-                <input
-                  class="client-line__input"
-                  type="text"
-                  value={quotation.client}
-                  placeholder={S.sheet.clientPlaceholder}
-                  aria-label={S.sheet.clientPlaceholder}
-                  onInput={(e) => actions.setClient((e.currentTarget as HTMLInputElement).value)}
-                />
+                <span class="client-line__text">
+                  <span class="client-line__prefix">{S.sheet.clientPrefix}</span>
+                  <input
+                    class="client-line__input"
+                    type="text"
+                    value={quotation.client}
+                    placeholder={S.sheet.clientPlaceholder}
+                    aria-label={S.sheet.clientPlaceholder}
+                    onInput={(e) => actions.setClient((e.currentTarget as HTMLInputElement).value)}
+                  />
+                </span>
               </span>
               {/* Print: static bidi-isolated text */}
               <span class="client-line__print" dir="rtl">
@@ -521,11 +523,12 @@ function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
 
       <div class="thanks-wrap">
         <AutoTextarea
-          class="thanks-field"
+          class="thanks-field thanks-field--screen"
           value={quotation.thankYou}
           aria-label="سطر الشكر"
           onInput={(e) => actions.setThankYou((e.currentTarget as HTMLTextAreaElement).value)}
         />
+        <div class="thanks-field thanks-field--print" dir="rtl"><bdi>{quotation.thankYou}</bdi></div>
       </div>
 
       <div class="approval-line">
@@ -539,9 +542,7 @@ function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
             onInput={(e) => actions.setApprover((e.currentTarget as HTMLInputElement).value)}
           />
         </span>
-        <span class="approval-line__print" dir="ltr">
-          {S.sheet.approval}{quotation.approver}
-        </span>
+        <span class="approval-line__print" dir="rtl"><bdi>{S.sheet.approval}{quotation.approver}</bdi></span>
       </div>
     </div>
   );
@@ -560,9 +561,9 @@ function TotalsRow({ label, value, grand }: { label: string; value: string; gran
       <tbody>
         <tr class={grand ? "trow-grand" : "trow-subtotal"}>
           <td class="cell-num" />
-          <td class="trow-label" colSpan={3}>
-            {label}
-          </td>
+          <td class="trow-label">{label}</td>
+          <td />
+          <td />
           <td class="cell-total">{value}</td>
         </tr>
       </tbody>
