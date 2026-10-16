@@ -88,7 +88,7 @@ console.log("\n[2] Static checks (dist/style/i18n):");
   })()), "utf8");
   // header colours / fonts checks loosely
   check("sheet.css: table header #e8e8e8", css.includes("#e8e8e8"), "");
-  check("sheet.css: title colour #1f6b99", css.includes("#1f6b99"), "");
+  check("sheet.css: title colour #000", css.includes("color:#000") || css.includes("color: #000"), "");
   check("sheet.css: solid black table borders", css.includes("1px solid #000") || css.includes("1px solid #000000"), "");
   check("sheet.css: no tinted total backgrounds", !css.includes("#fbfdff") && !css.includes("#f0f6fd"), "");
 }
