@@ -3,7 +3,7 @@ import type { AppState, Quotation } from "../state/quotation";
 import { S } from "../i18n/strings";
 import { companyDefaults } from "../config/company";
 import { diffCompany } from "../config/companyMerge";
-import { repo } from "../state/actions";
+import { repo, actions } from "../state/actions";
 import { IconClose } from "./icons";
 
 interface SettingsDialogProps {
@@ -35,6 +35,9 @@ export function SettingsDialog({
     const merged = { ...companyDefaults, ...draft };
     onSaveCompany(merged);
     repo.saveCompanyOverrides(diffCompany(merged));
+    for (const key of Object.keys(options) as (keyof typeof options)[]) {
+      actions.setOption(key, options[key]);
+    }
     onToast(S.settings.saved);
     onClose();
   };
@@ -316,24 +319,69 @@ export function SettingsDialog({
               />
               {S.settings.showDiscount}
             </label>
-            <label class="switch switch--sub">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={options.discountPercent}
-                disabled={!options.showDiscount}
-                class="input"
-                style={{ width: 90 }}
-                onInput={(e) =>
-                  setOptions((o) => ({
-                    ...o,
-                    discountPercent: Number((e.currentTarget as HTMLInputElement).value),
-                  }))
-                }
-              />
-              {S.settings.discountPercent}
-            </label>
+            {options.showDiscount && (
+              <div style={{ paddingInlineStart: 28, display: "flex", flexDirection: "column", gap: 8, marginBlock: 6 }}>
+                <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+                    <input
+                      type="radio"
+                      name="settings-discount-type"
+                      checked={options.discountType !== "fixed"}
+                      onChange={() => setOptions((o) => ({ ...o, discountType: "percent" }))}
+                    />
+                    {S.settings.discountTypePercent}
+                  </label>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+                    <input
+                      type="radio"
+                      name="settings-discount-type"
+                      checked={options.discountType === "fixed"}
+                      onChange={() => setOptions((o) => ({ ...o, discountType: "fixed" }))}
+                    />
+                    {S.settings.discountTypeFixed}
+                  </label>
+                </div>
+                <label class="switch switch--sub" style={{ margin: 0 }}>
+                  {options.discountType === "fixed" ? (
+                    <>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={options.discountValue}
+                        class="input"
+                        style={{ width: 110 }}
+                        onInput={(e) =>
+                          setOptions((o) => ({
+                            ...o,
+                            discountValue: Number((e.currentTarget as HTMLInputElement).value),
+                          }))
+                        }
+                      />
+                      {S.settings.discountValue}
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={options.discountPercent}
+                        class="input"
+                        style={{ width: 90 }}
+                        onInput={(e) =>
+                          setOptions((o) => ({
+                            ...o,
+                            discountPercent: Number((e.currentTarget as HTMLInputElement).value),
+                          }))
+                        }
+                      />
+                      {S.settings.discountPercent}
+                    </>
+                  )}
+                </label>
+              </div>
+            )}
             <label class="switch">
               <input
                 type="checkbox"

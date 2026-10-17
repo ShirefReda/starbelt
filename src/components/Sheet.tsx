@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { actions, store, repo } from "../state/actions";
-import type { AppState, Quotation, QuoteItem } from "../state/quotation";
+import type { AppState, Quotation, QuoteItem, QuoteOptions } from "../state/quotation";
 import { computeTotals, lineTotal } from "../utils/totals";
 import { formatInt, formatMoney } from "../utils/money";
 import { tafqeet } from "../utils/numberToWords";
@@ -542,6 +542,83 @@ function ItemRow({ item, index, itemNames }: ItemRowProps) {
   );
 }
 
+interface DiscountAddButtonProps {
+  options: QuoteOptions;
+}
+
+function DiscountAddButton({ options }: DiscountAddButtonProps) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  const addDiscount = (type: "percent" | "fixed") => {
+    actions.setOption("discountType", type);
+    if (type === "percent" && !options.discountPercent) {
+      actions.setOption("discountPercent", 10);
+    } else if (type === "fixed" && !options.discountValue) {
+      actions.setOption("discountValue", 500);
+    }
+    actions.setOption("showDiscount", true);
+    setOpen(false);
+  };
+
+  return (
+    <div class="discount-btn-wrap no-print" ref={wrapRef}>
+      <button
+        type="button"
+        class="btn btn--add-discount no-print"
+        onClick={() => setOpen((prev) => !prev)}
+        title="إضافة خصم (نسبة مئوية أو مبلغ ثابت)"
+        aria-expanded={open}
+        aria-haspopup="true"
+      >
+        <span>+ خصم</span>
+        <span class="discount-btn-caret">▾</span>
+      </button>
+
+      {open && (
+        <div class="discount-dropdown-menu" role="menu">
+          <button
+            type="button"
+            class="discount-dropdown-item"
+            role="menuitem"
+            onClick={() => addDiscount("percent")}
+          >
+            <span class="discount-dropdown-badge">%</span>
+            <span>نسبة مئوية (%)</span>
+          </button>
+          <button
+            type="button"
+            class="discount-dropdown-item"
+            role="menuitem"
+            onClick={() => addDiscount("fixed")}
+          >
+            <span class="discount-dropdown-badge">ج.م</span>
+            <span>مبلغ ثابت (ج.م)</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface TailBlockProps {
   quotation: Quotation;
   totals: ReturnType<typeof computeTotals>;
@@ -554,12 +631,91 @@ function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
     <div class="tail-block">
       <div class="totals-stack">
         {options.showDiscount && (
-          <TotalsRow label={S.options.discountLabel} value={formatMoney(totals.discountAmount)} />
+          <>
+            <TotalsRow label={S.options.subTotalLabel} value={formatMoney(totals.subtotal)} />
+            <TotalsRow
+              label={
+                measuring ? (
+                  options.discountType === "fixed"
+                    ? S.options.discountLabel
+                    : `${S.options.discountLabel} (${options.discountPercent}%)`
+                ) : (
+                  <>
+                    <span class="cell-screen">
+                      <span class="discount-row-editor">
+                        <span class="discount-editor__title">{S.options.discountLabel}</span>
+                        <span class="discount-type-pill" role="radiogroup" aria-label="نوع الخصم">
+                          <button
+                            type="button"
+                            class={`pill-btn ${options.discountType === "percent" ? "is-active" : ""}`}
+                            onClick={() => actions.setOption("discountType", "percent")}
+                            title="خصم نسبة مئوية (%)"
+                          >
+                            %
+                          </button>
+                          <button
+                            type="button"
+                            class={`pill-btn ${options.discountType === "fixed" ? "is-active" : ""}`}
+                            onClick={() => actions.setOption("discountType", "fixed")}
+                            title="خصم مبلغ ثابت (ج.م)"
+                          >
+                            ثابت
+                          </button>
+                        </span>
+                        <span class="discount-input-wrap">
+                          {options.discountType === "percent" ? (
+                            <NumericInput
+                              className="discount-input"
+                              value={options.discountPercent}
+                              ariaLabel="نسبة الخصم"
+                              onValue={(v) => actions.setOption("discountPercent", v)}
+                            />
+                          ) : (
+                            <NumericInput
+                              className="discount-input"
+                              value={options.discountValue}
+                              ariaLabel="قيمة الخصم"
+                              onValue={(v) => actions.setOption("discountValue", v)}
+                            />
+                          )}
+                          <span class="discount-suffix">
+                            {options.discountType === "percent" ? "%" : "ج.م"}
+                          </span>
+                        </span>
+                      </span>
+                    </span>
+                    <span class="cell-print">
+                      {options.discountType === "fixed"
+                        ? S.options.discountLabel
+                        : `${S.options.discountLabel} (${options.discountPercent}%)`}
+                    </span>
+                  </>
+                )
+              }
+              value={formatMoney(totals.discountAmount)}
+              action={
+                !measuring && (
+                  <button
+                    type="button"
+                    class="row-btn no-print"
+                    title="حذف الخصم"
+                    aria-label="حذف الخصم"
+                    onClick={() => actions.setOption("showDiscount", false)}
+                  >
+                    <IconTrash />
+                  </button>
+                )
+              }
+            />
+          </>
         )}
         {options.showVat && (
           <>
             {options.showDiscount && (
-              <TotalsRow label={S.options.subTotalLabel} value={formatMoney(totals.taxableBase)} />
+              <TotalsRow
+                label={S.options.subTotalAfterDiscount}
+                value={formatMoney(totals.taxableBase)}
+              />
             )}
             <TotalsRow
               label={S.options.vatLabel}
@@ -585,19 +741,23 @@ function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
           value={formatMoney(totals.total)}
           grand
           action={
-            !measuring &&
-            !options.showVat && (
-              <button
-                type="button"
-                class="btn btn--add-vat no-print"
-                onClick={() => {
-                  actions.setOption("vatRate", 14);
-                  actions.setOption("showVat", true);
-                }}
-                title="إضافة ضريبة 14%"
-              >
-                +14%
-              </button>
+            !measuring && (
+              <div class="totals-actions no-print">
+                {!options.showDiscount && <DiscountAddButton options={options} />}
+                {!options.showVat && (
+                  <button
+                    type="button"
+                    class="btn btn--add-vat no-print"
+                    onClick={() => {
+                      actions.setOption("vatRate", 14);
+                      actions.setOption("showVat", true);
+                    }}
+                    title="إضافة ضريبة 14%"
+                  >
+                    +14%
+                  </button>
+                )}
+              </div>
             )
           }
         />
@@ -683,7 +843,7 @@ function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
 }
 
 interface TotalsRowProps {
-  label: string;
+  label: preact.ComponentChildren;
   value: string;
   grand?: boolean;
   action?: preact.ComponentChildren;

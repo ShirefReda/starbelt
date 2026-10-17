@@ -500,6 +500,10 @@ body.is-exporting .autocomplete,
 body.is-exporting .sheet-measure,
 body.is-exporting .btn--add-attn,
 body.is-exporting .btn--add-vat,
+body.is-exporting .btn--add-discount,
+body.is-exporting .discount-btn-wrap,
+body.is-exporting .discount-row-editor,
+body.is-exporting .discount-dropdown-menu,
 body.is-exporting .row-btn {
   display: none !important;
 }
@@ -536,6 +540,13 @@ body.is-exporting .approval-line__input {
   gap: 8px;
 }
 
+.totals-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  vertical-align: middle;
+}
+
 .btn--add-vat {
   font-size: 14px;
   font-weight: 800;
@@ -561,6 +572,162 @@ body.is-exporting .approval-line__input {
   color: #ffffff;
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(11, 69, 114, 0.3);
+}
+
+.btn--add-discount {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0c6b39;
+  border: 1.5px solid #1ba358;
+  background: #edfbf2;
+  padding: 3px 12px;
+  border-radius: 18px;
+  white-space: nowrap;
+  flex: none;
+  cursor: pointer;
+  transition: all var(--duration-fast, 0.15s);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.4;
+  vertical-align: middle;
+  box-shadow: 0 1px 3px rgba(12, 107, 57, 0.15);
+}
+.btn--add-discount:hover {
+  background: #1ba358;
+  border-color: #1ba358;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(12, 107, 57, 0.3);
+}
+
+.discount-btn-caret {
+  font-size: 11px;
+}
+
+.discount-btn-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.discount-dropdown-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  inset-inline-start: 0;
+  z-index: 100;
+  background: #ffffff;
+  border: 1.5px solid #d0d7de;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  min-width: 175px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.discount-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2328;
+  cursor: pointer;
+  text-align: right;
+  width: 100%;
+  transition: background 0.15s, color 0.15s;
+}
+
+.discount-dropdown-item:hover {
+  background: #edfbf2;
+  color: #0c6b39;
+}
+
+.discount-dropdown-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: #e6f4ea;
+  color: #0c6b39;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.discount-row-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  vertical-align: middle;
+}
+
+.discount-editor__title {
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.discount-type-pill {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f3f5;
+  border: 1px solid #d0d7de;
+  border-radius: 14px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.discount-type-pill .pill-btn {
+  border: none;
+  background: transparent;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #57606a;
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1.2;
+}
+
+.discount-type-pill .pill-btn.is-active {
+  background: #1ba358;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.discount-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  border: 1.5px solid #1ba358;
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 1px 6px;
+  gap: 4px;
+}
+
+.discount-input-wrap .discount-input {
+  width: 58px;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+  color: #000;
+  background: transparent;
+  padding: 2px 0;
+}
+
+.discount-input-wrap .discount-suffix {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0c6b39;
 }
 
 /* ---- Tail block: notes, words, thanks, approval ------------------------- */

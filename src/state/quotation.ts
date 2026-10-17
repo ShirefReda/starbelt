@@ -20,15 +20,19 @@ export interface QuoteNote {
   text: string;
 }
 
+export type DiscountType = "percent" | "fixed";
+
 export interface QuoteOptions {
   /** Show auto quotation number + date near the title. */
   showNumberAndDate: boolean;
   /** VAT row (14%) under the totals. */
   showVat: boolean;
   vatRate: number; // percent, e.g. 14
-  /** Discount row (percent of subtotal). */
+  /** Discount row (percent or fixed amount). */
   showDiscount: boolean;
+  discountType: DiscountType;
   discountPercent: number;
+  discountValue: number;
   /** Tafqeet (amount in Arabic words) line. */
   showWords: boolean;
   /** Validity line, e.g. "هذا العرض ساري لمدة 30 يوم". */
@@ -61,7 +65,9 @@ export const defaultOptions: QuoteOptions = {
   showVat: false,
   vatRate: 14,
   showDiscount: false,
-  discountPercent: 0,
+  discountType: "percent",
+  discountPercent: 10,
+  discountValue: 0,
   showWords: false,
   showValidity: false,
   validityDays: 30,
@@ -103,6 +109,15 @@ export function migrateQuotation(raw: unknown): Quotation | null {
   const options: QuoteOptions = { ...defaultOptions };
   if (r.options && typeof r.options === "object") {
     Object.assign(options, r.options);
+    if (options.discountType !== "fixed" && options.discountType !== "percent") {
+      options.discountType = "percent";
+    }
+    if (typeof options.discountPercent !== "number") {
+      options.discountPercent = 10;
+    }
+    if (typeof options.discountValue !== "number") {
+      options.discountValue = 0;
+    }
   }
 
   return {

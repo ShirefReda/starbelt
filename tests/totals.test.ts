@@ -46,14 +46,55 @@ describe("computeTotals", () => {
     expect(t.total).toBe(1026);
   });
 
+  it("applies fixed amount discount before VAT", () => {
+    const t = computeTotals(
+      [item(1, 1000)],
+      opts({ showVat: true, vatRate: 14, showDiscount: true, discountType: "fixed", discountValue: 200 }),
+    );
+    expect(t.discountAmount).toBe(200);
+    expect(t.taxableBase).toBe(800);
+    expect(t.vatAmount).toBe(112);
+    expect(t.total).toBe(912);
+  });
+
+  it("applies fixed amount discount without VAT", () => {
+    const t = computeTotals(
+      [item(1, 1500)],
+      opts({ showDiscount: true, discountType: "fixed", discountValue: 300 }),
+    );
+    expect(t.discountAmount).toBe(300);
+    expect(t.total).toBe(1200);
+  });
+
+  it("clamps fixed discount to subtotal so total cannot be negative", () => {
+    const t = computeTotals(
+      [item(1, 500)],
+      opts({ showDiscount: true, discountType: "fixed", discountValue: 800 }),
+    );
+    expect(t.discountAmount).toBe(500);
+    expect(t.taxableBase).toBe(0);
+    expect(t.total).toBe(0);
+  });
+
+  it("clamps percentage discount to subtotal", () => {
+    const t = computeTotals(
+      [item(1, 1000)],
+      opts({ showDiscount: true, discountType: "percent", discountPercent: 120 }),
+    );
+    expect(t.discountAmount).toBe(1000);
+    expect(t.total).toBe(0);
+  });
+
   it("ignores discount when the option is off", () => {
-    const t = computeTotals([item(1, 1000)], opts({ showDiscount: false, discountPercent: 50 }));
+    const t = computeTotals([item(1, 1000)], opts({ showDiscount: false, discountPercent: 50, discountValue: 500 }));
     expect(t.discountAmount).toBe(0);
     expect(t.total).toBe(1000);
   });
 
   it("handles an empty item list", () => {
-    const t = computeTotals([], opts({ showVat: true }));
+    const t = computeTotals([], opts({ showVat: true, showDiscount: true, discountValue: 100 }));
     expect(t.total).toBe(0);
+    expect(t.discountAmount).toBe(0);
   });
 });
+
