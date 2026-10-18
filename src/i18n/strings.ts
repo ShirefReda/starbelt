@@ -122,6 +122,22 @@ export const S = {
     whatsappError: "تعذر الإرسال إلى واتساب",
     whatsappNoSelection: "اختر رقمًا واحدًا على الأقل",
   },
+  updates: {
+    dialogTitle: "تحديث جديد للنظام — سجل الإصلاحات",
+    versionPrefix: "VERSION",
+    newBadge: "تحديث جديد",
+    latestTitle: "آخر التحديثات والإصلاحات",
+    dismiss: "فهمت، متابعة العمل",
+    viewHistory: "عرض الإصدارات السابقة",
+    hideHistory: "إخفاء الإصدارات السابقة",
+    categories: {
+      bug: "إصلاح خطأ (BUG)",
+      feat: "ميزة جديدة (NEW)",
+      improvement: "تحسين",
+    },
+    autoAlertMessage: "تم تطبيق تحديثات هامة على المنظومة للحفاظ على دقة الحسابات والأداء.",
+    toolbarTooltip: "سجل التحديثات والإصلاحات",
+  },
   a11y: {
     mainContent: "المحتوى الرئيسى",
     sheetRegion: "ورقة عرض السعر",

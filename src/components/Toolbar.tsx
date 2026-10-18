@@ -1,5 +1,6 @@
 import { S } from "../i18n/strings";
 import type { AppState } from "../state/quotation";
+import { CURRENT_VERSION } from "../config/version";
 import {
   IconAdd,
   IconFit,
@@ -8,6 +9,7 @@ import {
   IconPdf,
   IconPrint,
   IconRedo,
+  IconSparkle,
   IconTrash,
   IconUndo,
   IconWhatsapp,
@@ -20,6 +22,8 @@ interface ToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   zoom: number;
+  hasUnseenUpdate?: boolean;
+  onShowUpdates: () => void;
   onNew: () => void;
   onAddItem: () => void;
   onDownloadPdf: () => void;
@@ -39,6 +43,8 @@ export function Toolbar({
   canUndo,
   canRedo,
   zoom,
+  hasUnseenUpdate = false,
+  onShowUpdates,
   onNew,
   onAddItem,
   onDownloadPdf,
@@ -142,6 +148,24 @@ export function Toolbar({
         <span class="saved-pill__dot" />
         {saveLabel}
       </span>
+
+      <button
+        type="button"
+        class={`btn-version${hasUnseenUpdate ? " btn-version--has-update" : ""}`}
+        onClick={onShowUpdates}
+        title={S.updates.toolbarTooltip}
+      >
+        <IconSparkle />
+        <span class="btn-version__text">
+          <span class="btn-version__label">{S.updates.versionPrefix}</span>
+          <span class="btn-version__num">{CURRENT_VERSION}</span>
+        </span>
+        {hasUnseenUpdate && (
+          <span class="btn-version__badge" title={S.updates.newBadge}>
+            {S.updates.newBadge}
+          </span>
+        )}
+      </button>
 
       <div class="toolbar__group">
         <button

@@ -107,6 +107,29 @@ Change values, then `npm run build`. Staff can also edit **every** field in the 
 *الإعدادات* dialog; overrides live in `localStorage` under `sb.company.*` and
 survive rebuilds. Use *استعادة الإعدادات الافتراضية* in that dialog to revert.
 
+## 🚀 نظام الإصدارات والتحديثات التلقائية (Versioning & Updates System)
+
+الملف المسؤول: `src/config/version.ts`
+
+عند إصلاح أي خطأ أو إضافة ميزة جديدة، وتريد ظهور نافذة التحديث فوراً لجميع المستخدمين:
+1. افتح ملف `src/config/version.ts`.
+2. حدّث رقم الإصدار `CURRENT_VERSION` (مثال: `"1.1.1"` أو `"1.2.0"`).
+3. أضف عنصراً جديداً في أعلى مصفوفة `APP_VERSIONS`:
+```ts
+{
+  version: "1.1.1",
+  date: "19 أكتوبر 2026",
+  title: "إصلاح عاجل",
+  changes: [
+    { category: "bug", text: "خطأ في تسعير السيور الدائرية" },
+    { category: "bug", text: "خطأ في كتابة الأصناف" }
+  ]
+}
+```
+4. ابنِ المشروع `npm run build`.
+- **النتيجة**: بمجرد دخول أي مستخدم للموقع، ستظهر له تلقائياً نافذة منبثقة أنيقة بعنوان الإصدار وقائمة الأخطاء المصلحة، مع زر تأكيد الفهم والمتابعة.
+- يمكن للمستخدمين أيضاً فتح سجل التحديثات في أي وقت عبر زر `VERSION` في شريط الأدوات أو من نافذة الإعدادات.
+
 Document options (VAT 14%, discount %, tafqeet, validity days, watermark,
 quotations number+date) live in `src/state/quotation.ts` (`defaultOptions`) and
 are toggled per-quotation via Settings. VAT/discount/total rows show directly on

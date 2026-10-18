@@ -3,8 +3,9 @@ import type { AppState, Quotation } from "../state/quotation";
 import { S } from "../i18n/strings";
 import { companyDefaults } from "../config/company";
 import { diffCompany } from "../config/companyMerge";
+import { CURRENT_VERSION } from "../config/version";
 import { repo, actions } from "../state/actions";
-import { IconClose } from "./icons";
+import { IconClose, IconSparkle } from "./icons";
 
 interface SettingsDialogProps {
   state: AppState;
@@ -13,6 +14,7 @@ interface SettingsDialogProps {
   onResetCompany: () => void;
   onImportQuotation: (q: Quotation) => void;
   onToast: (msg: string, isError?: boolean) => void;
+  onShowUpdates?: () => void;
 }
 
 export function SettingsDialog({
@@ -22,6 +24,7 @@ export function SettingsDialog({
   onResetCompany,
   onImportQuotation,
   onToast,
+  onShowUpdates,
 }: SettingsDialogProps) {
   const [draft, setDraft] = useState(state.company);
   const [options, setOptions] = useState(state.quotation.options);
@@ -464,6 +467,27 @@ export function SettingsDialog({
                   (e.currentTarget as HTMLInputElement).value = "";
                 }}
               />
+            </div>
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset__legend">إصدار المنظومة وسجل التحديثات</legend>
+            <div class="settings-version-box">
+              <div class="settings-version-info">
+                <span>الإصدار المثبت: </span>
+                <span class="num">VERSION {CURRENT_VERSION}</span>
+              </div>
+              <button
+                type="button"
+                class="btn"
+                onClick={() => {
+                  onClose();
+                  onShowUpdates?.();
+                }}
+              >
+                <IconSparkle />
+                <span>سجل التحديثات والإصلاحات</span>
+              </button>
             </div>
           </fieldset>
         </div>

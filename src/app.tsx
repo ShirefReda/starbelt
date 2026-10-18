@@ -7,6 +7,8 @@ import { Toolbar } from "./components/Toolbar";
 import { Sheet } from "./components/Sheet";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { WhatsappDialog } from "./components/WhatsappDialog";
+import { UpdatesDialog } from "./components/UpdatesDialog";
+import { CURRENT_VERSION, markVersionAsSeen, shouldShowUpdatesPrompt } from "./config/version";
 import { exportPdf } from "./pdf/exporter";
 import { requestFocus } from "./state/focusBus";
 import { mergeCompany } from "./config/companyMerge";
@@ -19,6 +21,8 @@ export function App() {
   const [fitMode, setFitMode] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [showWhatsapp, setShowWhatsapp] = useState(false);
+  const [showUpdates, setShowUpdates] = useState(() => shouldShowUpdatesPrompt());
+  const [hasUnseenUpdate, setHasUnseenUpdate] = useState(() => shouldShowUpdatesPrompt());
   const [confirmClear, setConfirmClear] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -159,6 +163,16 @@ export function App() {
     localStorage.setItem("sb.hintSeen", "1");
   }, []);
 
+  const handleCloseUpdates = useCallback(() => {
+    markVersionAsSeen(CURRENT_VERSION);
+    setShowUpdates(false);
+    setHasUnseenUpdate(false);
+  }, []);
+
+  const handleOpenUpdates = useCallback(() => {
+    setShowUpdates(true);
+  }, []);
+
   const fileName = useMemo(() => quotationFileName(state.quotation), [state.quotation]);
 
   return (
@@ -169,6 +183,8 @@ export function App() {
           canUndo={store.canUndo}
           canRedo={store.canRedo}
           zoom={zoom}
+          hasUnseenUpdate={hasUnseenUpdate}
+          onShowUpdates={handleOpenUpdates}
           onNew={handleNew}
           onAddItem={handleAddItem}
           onDownloadPdf={handleDownloadPdf}
@@ -236,6 +252,7 @@ export function App() {
           onResetCompany={handleResetCompany}
           onImportQuotation={handleImportQuotation}
           onToast={pushToast}
+          onShowUpdates={handleOpenUpdates}
         />
       )}
 
@@ -244,6 +261,13 @@ export function App() {
           quotation={state.quotation}
           onClose={() => setShowWhatsapp(false)}
           onToast={pushToast}
+        />
+      )}
+
+      {showUpdates && (
+        <UpdatesDialog
+          onClose={handleCloseUpdates}
+          isFirstVisitAfterUpdate={hasUnseenUpdate}
         />
       )}
 
