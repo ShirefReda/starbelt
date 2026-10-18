@@ -25,9 +25,34 @@ export interface AppVersion {
   changes: VersionChange[];
 }
 
-export const CURRENT_VERSION = "1.1.0";
+export const CURRENT_VERSION = "1.1.1";
 
 export const APP_VERSIONS: [AppVersion, ...AppVersion[]] = [
+  {
+    version: "1.1.1",
+    date: "18 أكتوبر 2026",
+    title: "إصلاح تداخل نصوص ومقاسات الأصناف في PDF",
+    summary:
+      "معالجة مشكلة تداخل الأسطر والأرقام والمقاسات (مثل 34 سم ومقاس 3.25 م) في جدول الأصناف عند تصدير وطباعة PDF.",
+    changes: [
+      {
+        category: "bug",
+        text: "إصلاح تداخل نصوص الأصناف في PDF (معالجة تصادم الأسطر والأرقام والأبعاد مثل 34 سم ومقاس 3.25م ومنع تداخل الكلمات عمودياً)",
+      },
+      {
+        category: "bug",
+        text: "خطأ في كتابة الأصناف (ضبط تباعد الأسطر line-height وعزل الاتجاه ثنائي اللغة RTL لمنع انعكاس الأرقام أو انقسام الوحدات)",
+      },
+      {
+        category: "bug",
+        text: "خطأ في التسعير (استمرار تدقيق وضمان دقة حسابات الخصم والضرائب والإجماليات)",
+      },
+      {
+        category: "improvement",
+        text: "تحسين مظهر ووضوح جدول الأصناف في الطباعة وتصدير PDF المباشر على جميع الشاشات والأجهزة",
+      },
+    ],
+  },
   {
     version: "1.1.0",
     date: "18 أكتوبر 2026",

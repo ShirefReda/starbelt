@@ -17,14 +17,14 @@ describe("Versioning & Changelog System", () => {
   });
 
   it("CURRENT_VERSION matches the latest release version in APP_VERSIONS", () => {
-    expect(CURRENT_VERSION).toBe("1.1.0");
+    expect(CURRENT_VERSION).toBe("1.1.1");
     expect(APP_VERSIONS.length).toBeGreaterThan(0);
     expect(APP_VERSIONS[0]?.version).toBe(CURRENT_VERSION);
   });
 
   it("getLatestVersion returns the current release with title and changes", () => {
     const latest = getLatestVersion();
-    expect(latest.version).toBe("1.1.0");
+    expect(latest.version).toBe("1.1.1");
     expect(latest.title).toBeTruthy();
     expect(latest.changes.length).toBeGreaterThan(0);
   });

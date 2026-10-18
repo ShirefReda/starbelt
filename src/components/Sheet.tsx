@@ -502,7 +502,7 @@ function ItemRow({ item, index, itemNames }: ItemRowProps) {
           />
         </span>
         <span class="cell-print" dir="rtl">
-          <bdi>{item.name || "‏"}</bdi>
+          {item.name || "‏"}
         </span>
       </td>
       <td class="cell-qty">
