@@ -67,14 +67,14 @@ export const IconGear = () => (
   </Svg>
 );
 
-export const IconTrash = () => (
-  <Svg>
+export const IconTrash = ({ size = 17 }: IconProps) => (
+  <Svg size={size}>
     <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z" />
   </Svg>
 );
 
-export const IconDrag = () => (
-  <Svg>
+export const IconDrag = ({ size = 17 }: IconProps) => (
+  <Svg size={size}>
     <circle cx="9" cy="6" r="1.6" fill="currentColor" />
     <circle cx="15" cy="6" r="1.6" fill="currentColor" />
     <circle cx="9" cy="12" r="1.6" fill="currentColor" />
@@ -145,4 +145,28 @@ export const IconBug = () => (
     <path d="M12 20v-9M6.53 9C4.6 8.8 3 7.1 3 5M6 13H2M3 21c0-2.1 1.7-3.9 3.8-4M20.97 5c0 2.1-1.6 3.8-3.5 4M18 13h4M17.2 17c2.1.1 3.8 1.9 3.8 4" />
   </Svg>
 );
+
+export const IconStar = ({ size = 17, filled = false }: IconProps & { filled?: boolean }) => (
+  <Svg
+    size={size}
+    fill={filled ? "currentColor" : "none"}
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+  </Svg>
+);
+
+export const IconArrowUp = ({ size = 15 }: IconProps) => (
+  <Svg size={size}>
+    <path d="m18 15-6-6-6 6" />
+  </Svg>
+);
+
+export const IconArrowDown = ({ size = 15 }: IconProps) => (
+  <Svg size={size}>
+    <path d="m6 9 6 6 6-6" />
+  </Svg>
+);
+
 
