@@ -1,7 +1,7 @@
 {
   "name": "starbelt-quotations",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "type": "module",
   "description": "Star Belt - professional Arabic price quotations (بيان سعر) maker with offline PWA support",
   "scripts": {
