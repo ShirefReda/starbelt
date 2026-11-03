@@ -10,7 +10,7 @@
  * Bump CACHE_VERSION to invalidate old caches on the next deploy.
  */
 
-const CACHE_VERSION = "sb-quotations-v1";
+const CACHE_VERSION = "sb-quotations-v2";
 const SHELL = [
   "./",
   "./index.html",
@@ -20,6 +20,7 @@ const SHELL = [
   "./icons/icon-maskable-512.png",
   "./icons/apple-touch-icon.png",
   "./assets/logo.png",
+  "./assets/logo.svg",
 ];
 
 self.addEventListener("install", (event) => {

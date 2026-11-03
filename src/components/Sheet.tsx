@@ -30,7 +30,21 @@ export function Sheet({ state, zoom }: SheetProps) {
   const options = quotation.options;
   const totals = useMemo(() => computeTotals(quotation.items, options), [quotation.items, options]);
 
+  const [logoSrc, setLogoSrc] = useState(company.logo);
   const [logoOk, setLogoOk] = useState(true);
+
+  useEffect(() => {
+    setLogoSrc(company.logo);
+    setLogoOk(true);
+  }, [company.logo]);
+
+  const handleLogoError = () => {
+    if (logoSrc !== "assets/logo.png") {
+      setLogoSrc("assets/logo.png");
+    } else {
+      setLogoOk(false);
+    }
+  };
   const [itemNames, setItemNames] = useState<string[]>(() => repo.getItemNames());
   const [breaks, setBreaks] = useState<number[]>([quotation.items.length]);
   const measureRef = useRef<HTMLDivElement>(null);
@@ -187,8 +201,9 @@ export function Sheet({ state, zoom }: SheetProps) {
               company={company}
               totals={totals}
               page={page}
+              logoSrc={logoSrc}
               logoOk={logoOk}
-              onLogoError={() => setLogoOk(false)}
+              onLogoError={handleLogoError}
               itemNames={itemNames}
             />
           ))}
@@ -226,6 +241,7 @@ interface SheetPageProps {
   company: AppState["company"];
   totals: ReturnType<typeof computeTotals>;
   page: BuiltPage;
+  logoSrc: string;
   logoOk: boolean;
   onLogoError: () => void;
   itemNames: string[];
@@ -238,6 +254,7 @@ function SheetPage({
   company,
   totals,
   page,
+  logoSrc,
   logoOk,
   onLogoError,
   itemNames,
@@ -251,7 +268,13 @@ function SheetPage({
     <div class="sheet-page" data-page={pageIndex}>
       {options.showWatermark && logoOk && (
         <div class="page-watermark" aria-hidden="true">
-          <img src={company.logo} alt="" onError={onLogoError} />
+          <img
+            src={logoSrc}
+            alt=""
+            crossOrigin="anonymous"
+            loading="eager"
+            onError={onLogoError}
+          />
         </div>
       )}
 
@@ -268,7 +291,13 @@ function SheetPage({
           </div>
           {logoOk && (
             <div class="logo-block">
-              <img src={company.logo} alt={company.name} onError={onLogoError} />
+              <img
+                src={logoSrc}
+                alt={company.name}
+                crossOrigin="anonymous"
+                loading="eager"
+                onError={onLogoError}
+              />
             </div>
           )}
         </div>

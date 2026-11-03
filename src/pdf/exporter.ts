@@ -28,6 +28,11 @@
 
 import type { Quotation } from "../state/quotation";
 import { quotationFileName } from "../state/actions";
+import {
+  ensureSheetImagesReady,
+  getReliableLogo,
+  prepareClonedDocForCapture,
+} from "../utils/captureHelper";
 
 export interface ExportCallbacks {
   onStart: () => void;
@@ -302,6 +307,13 @@ export async function exportPdfViaRaster(
         /* ignore */
       }
     }
+
+    const sheetRoot = document.querySelector<HTMLElement>(".sheet") || document.body;
+    const [, backupLogo] = await Promise.all([
+      ensureSheetImagesReady(sheetRoot),
+      getReliableLogo(),
+    ]);
+
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
     );
@@ -330,10 +342,7 @@ export async function exportPdfViaRaster(
           useCORS: true,
           logging: false,
           onclone: (clonedDoc) => {
-            clonedDoc.body.classList.add("is-exporting");
-            clonedDoc.body.classList.remove("is-editing");
-            const clonedScale = clonedDoc.querySelector<HTMLElement>(".sheet-scale");
-            if (clonedScale) clonedScale.style.transform = "none";
+            prepareClonedDocForCapture(clonedDoc, pages[i]!, backupLogo);
           },
         });
         if (i > 0) pdf.addPage();

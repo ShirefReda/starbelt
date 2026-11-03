@@ -5,6 +5,11 @@
  */
 
 import { fileNameForQuote as pngFileName } from "./whatsapp";
+import {
+  ensureSheetImagesReady,
+  getReliableLogo,
+  prepareClonedDocForCapture,
+} from "./captureHelper";
 
 export type QuoteMediaKind = "png" | "pdf";
 
@@ -21,7 +26,10 @@ export function mediaFileName(client: string, kind: QuoteMediaKind): string {
   return safe ? `عرض سعر - ${safe} - ${date}.${ext}` : `عرض سعر - ${date}.${ext}`;
 }
 
-async function withExportMode<T>(fn: () => Promise<T>): Promise<T> {
+async function withExportMode<T>(
+  sheetEl: HTMLElement,
+  fn: (backupLogo: HTMLImageElement | null) => Promise<T>,
+): Promise<T> {
   const body = document.body;
   const wasEditing = body.classList.contains("is-editing");
   body.classList.remove("is-editing");
@@ -39,12 +47,18 @@ async function withExportMode<T>(fn: () => Promise<T>): Promise<T> {
     }
   }
 
+  // Ensure DOM images are loaded & decoded, and have backup logo decoded in memory
+  const [, backupLogo] = await Promise.all([
+    ensureSheetImagesReady(sheetEl),
+    getReliableLogo(),
+  ]);
+
   await new Promise<void>((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
   );
 
   try {
-    return await fn();
+    return await fn(backupLogo);
   } finally {
     body.classList.remove("is-exporting");
     if (wasEditing) body.classList.add("is-editing");
@@ -56,7 +70,7 @@ async function withExportMode<T>(fn: () => Promise<T>): Promise<T> {
 export async function renderSheetAsPngBlob(sheetEl: HTMLElement): Promise<Blob> {
   const { default: html2canvas } = await import("html2canvas");
 
-  return withExportMode(async () => {
+  return withExportMode(sheetEl, async (backupLogo) => {
     const pages = Array.from(sheetEl.querySelectorAll<HTMLElement>(".sheet-page"));
     const capture = (el: HTMLElement) =>
       html2canvas(el, {
@@ -65,10 +79,7 @@ export async function renderSheetAsPngBlob(sheetEl: HTMLElement): Promise<Blob> 
         useCORS: true,
         logging: false,
         onclone: (clonedDoc) => {
-          clonedDoc.body.classList.add("is-exporting");
-          clonedDoc.body.classList.remove("is-editing");
-          const clonedScale = clonedDoc.querySelector<HTMLElement>(".sheet-scale");
-          if (clonedScale) clonedScale.style.transform = "none";
+          prepareClonedDocForCapture(clonedDoc, el, backupLogo);
         },
       });
 
@@ -109,7 +120,7 @@ export async function renderSheetAsPdfBlob(sheetEl: HTMLElement): Promise<Blob> 
     import("jspdf"),
   ]);
 
-  return withExportMode(async () => {
+  return withExportMode(sheetEl, async (backupLogo) => {
     const pages = Array.from(sheetEl.querySelectorAll<HTMLElement>(".sheet-page"));
     if (pages.length === 0) throw new Error("no-pages");
 
@@ -126,10 +137,7 @@ export async function renderSheetAsPdfBlob(sheetEl: HTMLElement): Promise<Blob> 
         useCORS: true,
         logging: false,
         onclone: (clonedDoc) => {
-          clonedDoc.body.classList.add("is-exporting");
-          clonedDoc.body.classList.remove("is-editing");
-          const clonedScale = clonedDoc.querySelector<HTMLElement>(".sheet-scale");
-          if (clonedScale) clonedScale.style.transform = "none";
+          prepareClonedDocForCapture(clonedDoc, pages[i]!, backupLogo);
         },
       });
       if (i > 0) pdf.addPage();

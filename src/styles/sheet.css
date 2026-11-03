@@ -86,7 +86,8 @@
   align-items: center;
 }
 
-.logo-block img {
+.logo-block img,
+.logo-block canvas {
   height: 24mm;
   width: auto;
   display: block;
@@ -105,7 +106,8 @@
   user-select: none;
 }
 
-.page-watermark img {
+.page-watermark img,
+.page-watermark canvas {
   width: 100%;
   height: auto;
   opacity: 0.08;
