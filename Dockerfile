@@ -22,12 +22,15 @@ RUN printf 'server {\n\
   location / {\n\
     try_files $uri $uri/ /index.html;\n\
   }\n\
+  location = /index.html {\n\
+    add_header Cache-Control "no-cache, no-store, must-revalidate";\n\
+  }\n\
   location ~* \\.(?:css|js|woff2|png|svg|webmanifest)$ {\n\
     expires 1y;\n\
     add_header Cache-Control "public, immutable";\n\
   }\n\
   location = /sw.js {\n\
-    add_header Cache-Control "no-cache";\n\
+    add_header Cache-Control "no-cache, no-store, must-revalidate";\n\
   }\n\
 }\n' > /etc/nginx/conf.d/default.conf
 EXPOSE 8000

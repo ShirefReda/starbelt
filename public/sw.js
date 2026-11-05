@@ -10,7 +10,7 @@
  * Bump CACHE_VERSION to invalidate old caches on the next deploy.
  */
 
-const CACHE_VERSION = "sb-quotations-v2";
+const CACHE_VERSION = "sb-quotations-v1.2.2";
 const SHELL = [
   "./",
   "./index.html",
