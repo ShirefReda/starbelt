@@ -47,7 +47,15 @@ type Step = "render" | "done";
 export function WhatsappDialog({ quotation, onClose, onToast }: WhatsappDialogProps) {
   const [contacts, setContacts] = useState<ContactItem[]>(() => loadContacts());
   const [selected, setSelected] = useState<Set<string>>(() => new Set<string>());
-  const [mediaKind, setMediaKind] = useState<QuoteMediaKind>("png");
+  const [mediaKind, setMediaKind] = useState<QuoteMediaKind>(() => {
+    try {
+      const saved = localStorage.getItem("sb.waMediaKind");
+      if (saved === "png" || saved === "pdf") return saved;
+    } catch {
+      /* ignore */
+    }
+    return "pdf";
+  });
   const [step, setStep] = useState<Step>("render");
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -374,29 +382,43 @@ export function WhatsappDialog({ quotation, onClose, onToast }: WhatsappDialogPr
             اختر الصيغة (صورة أو PDF) والأرقام المطلوبة. يمكنك كتابة أي رقم إضافي غير مسجل وترتيب جهات الاتصال بالسحب كما تحب (تُحفظ تفضيلاتك محلياً بجهازك).
           </p>
 
-          {/* Media Format Selector: PNG vs PDF */}
+          {/* Media Format Selector: PDF vs PNG */}
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-            <label class={`btn${mediaKind === "png" ? " btn--primary" : ""}`} style={{ flex: 1, justifyContent: "center" }}>
-              <input
-                type="radio"
-                name="wa-media-kind"
-                checked={mediaKind === "png"}
-                onChange={() => setMediaKind("png")}
-                disabled={busy}
-                style={{ marginInlineEnd: 6 }}
-              />
-              صورة (PNG)
-            </label>
             <label class={`btn${mediaKind === "pdf" ? " btn--primary" : ""}`} style={{ flex: 1, justifyContent: "center" }}>
               <input
                 type="radio"
                 name="wa-media-kind"
                 checked={mediaKind === "pdf"}
-                onChange={() => setMediaKind("pdf")}
+                onChange={() => {
+                  setMediaKind("pdf");
+                  try {
+                    localStorage.setItem("sb.waMediaKind", "pdf");
+                  } catch {
+                    /* ignore */
+                  }
+                }}
                 disabled={busy}
                 style={{ marginInlineEnd: 6 }}
               />
               بي دي اف (PDF)
+            </label>
+            <label class={`btn${mediaKind === "png" ? " btn--primary" : ""}`} style={{ flex: 1, justifyContent: "center" }}>
+              <input
+                type="radio"
+                name="wa-media-kind"
+                checked={mediaKind === "png"}
+                onChange={() => {
+                  setMediaKind("png");
+                  try {
+                    localStorage.setItem("sb.waMediaKind", "png");
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                disabled={busy}
+                style={{ marginInlineEnd: 6 }}
+              />
+              صورة (PNG)
             </label>
           </div>
 
