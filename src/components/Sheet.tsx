@@ -8,6 +8,7 @@ import { displayDate } from "../utils/id";
 import { t, S } from "../i18n/strings";
 import { CONTENT_H, CONTENT_W } from "../utils/geometry";
 import { paginateRows } from "../utils/pagination";
+import { formatArabicMeasurements } from "../utils/textFormatter";
 import { AutoTextarea } from "./AutoTextarea";
 import { NumericInput } from "./NumericInput";
 import { ItemNameInput } from "./ItemNameInput";
@@ -175,7 +176,7 @@ export function Sheet({ state, zoom }: SheetProps) {
               <tr key={item.id} data-measure-row={i}>
                 <td class="cell-num">{i + 1}</td>
                 <td class="cell-item">
-                  <div class="item-editor">{item.name || "‏"}</div>
+                  <div class="item-editor">{formatArabicMeasurements(item.name) || "‏"}</div>
                 </td>
                 <td class="cell-qty">{formatInt(item.qty)}</td>
                 <td class="cell-price">{formatMoney(item.price)}</td>
@@ -531,7 +532,7 @@ function ItemRow({ item, index, itemNames }: ItemRowProps) {
           />
         </span>
         <span class="cell-print" dir="rtl">
-          {item.name || "‏"}
+          {formatArabicMeasurements(item.name) || "‏"}
         </span>
       </td>
       <td class="cell-qty">
@@ -821,7 +822,7 @@ function TailBlock({ quotation, totals, measuring }: TailBlockProps) {
               }
             />
             {/* Print static version for bidi-correct rendering */}
-            <span class="note-editor__print" dir="rtl"><bdi>{note.text}</bdi></span>
+            <span class="note-editor__print" dir="rtl"><bdi>{formatArabicMeasurements(note.text)}</bdi></span>
             {!measuring && (
               <button
                 type="button"

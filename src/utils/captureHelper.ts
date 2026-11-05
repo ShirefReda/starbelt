@@ -1,4 +1,5 @@
 import { STARBELT_LOGO_DATA_URI } from "../config/logoFallback";
+import { formatArabicMeasurements } from "./textFormatter";
 
 /**
  * Cache for reliable logo HTMLImageElement so we only decode once.
@@ -203,6 +204,31 @@ export function prepareClonedDocForCapture(
       img.src = new URL(img.getAttribute("src") || "", window.location.href).href;
     } catch {
       /* ignore */
+    }
+  }
+
+  // Normalize typography & spacing in printable text elements so html2canvas avoids
+  // multi-rect word breaking on mixed numbers/units (e.g. "50سم", "41متر", "2م*عرض")
+  const printElements = Array.from(
+    clonedDoc.querySelectorAll<HTMLElement>(
+      ".cell-print, .note-editor__print, .client-line__print, .cell-item, .thanks-field--print, .approval-line__print",
+    ),
+  );
+  for (const el of printElements) {
+    if (el.childNodes.length === 1 && el.firstChild?.nodeType === 3 /* Node.TEXT_NODE */) {
+      const val = el.firstChild.nodeValue;
+      if (val && /[\u0621-\u064A\u0671-\u06D3]/.test(val)) {
+        el.firstChild.nodeValue = formatArabicMeasurements(val);
+      }
+    } else {
+      const walker = clonedDoc.createTreeWalker(el, 4 /* NodeFilter.SHOW_TEXT */);
+      let textNode: Text | null;
+      while ((textNode = walker.nextNode() as Text | null)) {
+        const val = textNode.nodeValue;
+        if (val && /[\u0621-\u064A\u0671-\u06D3]/.test(val)) {
+          textNode.nodeValue = formatArabicMeasurements(val);
+        }
+      }
     }
   }
 }

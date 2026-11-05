@@ -66,4 +66,31 @@ describe("Capture Helper & Mobile Logo Reliability", () => {
     expect(clonedDoc.body.classList.contains("is-editing")).toBe(false);
     expect(scaleEl.style.transform).toBe("none");
   });
+
+  it("normalizes Arabic measurements and units in printable elements", () => {
+    const liveDoc = document.implementation.createHTMLDocument("live");
+    const container = liveDoc.createElement("div");
+    container.innerHTML = `
+      <table>
+        <tr>
+          <td class="cell-item">
+            <span class="cell-print">وصله سير 2م*عرض 50سم</span>
+          </td>
+        </tr>
+      </table>
+      <div class="note-editor__print">التوريد خلال 10أيام والضمان 6شهور</div>
+    `;
+    liveDoc.body.appendChild(container);
+
+    const clonedDoc = document.implementation.createHTMLDocument("cloned");
+    clonedDoc.body.appendChild(container.cloneNode(true));
+
+    prepareClonedDocForCapture(clonedDoc, container, null);
+
+    const printCell = clonedDoc.querySelector(".cell-print");
+    expect(printCell?.textContent).toBe("وصله سير 2 م * عرض 50 سم");
+
+    const notePrint = clonedDoc.querySelector(".note-editor__print");
+    expect(notePrint?.textContent).toBe("التوريد خلال 10 أيام والضمان 6 شهور");
+  });
 });

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AutoTextarea } from "./AutoTextarea";
+import { formatArabicMeasurements } from "../utils/textFormatter";
 
 interface ItemNameInputProps {
   value: string;
@@ -52,8 +53,9 @@ export function ItemNameInput({
   }, [open]);
 
   const accept = (name: string) => {
-    onChange(name);
-    onCommit?.(name);
+    const formatted = formatArabicMeasurements(name);
+    onChange(formatted);
+    onCommit?.(formatted);
     setOpen(false);
   };
 
@@ -81,6 +83,8 @@ export function ItemNameInput({
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      const formatted = formatArabicMeasurements(value);
+      if (formatted !== value) onChange(formatted);
       onEnter?.();
     }
   };
@@ -103,7 +107,9 @@ export function ItemNameInput({
         }}
         onKeyDown={handleKeyDown}
         onBlur={() => {
-          onCommit?.(value);
+          const formatted = formatArabicMeasurements(value);
+          if (formatted !== value) onChange(formatted);
+          onCommit?.(formatted);
           // Delay so a click on an option still registers.
           setTimeout(() => setOpen(false), 120);
         }}

@@ -445,6 +445,8 @@ body.is-editing .date-line__input:focus {
   padding: 1.2mm 0;
   text-align: right;
   line-height: 1.55;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-break: normal;
@@ -789,6 +791,8 @@ body.is-exporting .approval-line__input {
   color: #000;
   text-align: right;
   unicode-bidi: plaintext;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
   flex: 1;
 }
 @media print {
