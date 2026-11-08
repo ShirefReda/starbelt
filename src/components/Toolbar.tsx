@@ -5,6 +5,7 @@ import {
   IconAdd,
   IconFit,
   IconGear,
+  IconHistory,
   IconNew,
   IconPdf,
   IconPrint,
@@ -24,6 +25,7 @@ interface ToolbarProps {
   zoom: number;
   hasUnseenUpdate?: boolean;
   onShowUpdates: () => void;
+  onShowHistory?: () => void;
   onNew: () => void;
   onAddItem: () => void;
   onDownloadPdf: () => void;
@@ -45,6 +47,7 @@ export function Toolbar({
   zoom,
   hasUnseenUpdate = false,
   onShowUpdates,
+  onShowHistory,
   onNew,
   onAddItem,
   onDownloadPdf,
@@ -83,6 +86,12 @@ export function Toolbar({
           <IconNew />
           <span class="btn__label">{S.toolbar.newQuotation}</span>
         </button>
+        {onShowHistory && (
+          <button type="button" class="btn" onClick={onShowHistory} title="سجل عروض الأسعار">
+            <IconHistory />
+            <span class="btn__label">سجل العروض</span>
+          </button>
+        )}
         <button type="button" class="btn btn--add-item" onClick={onAddItem} title={S.toolbar.addItem}>
           <IconAdd />
           <span class="btn__label">{S.toolbar.addItem}</span>

@@ -17,6 +17,7 @@
     "check:pdf": "node scripts/check-pdf.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.2",
     "preact": "^10.25.0"

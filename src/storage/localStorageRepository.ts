@@ -8,6 +8,7 @@
 import type { Quotation } from "../state/quotation";
 import { migrateQuotation } from "../state/quotation";
 import type { QuotationRepository } from "./repository";
+import { saveQuotationToSupabase } from "../services/supabase";
 
 const KEYS = {
   draft: "sb.draft.v1",
@@ -104,6 +105,7 @@ export class LocalStorageQuotationRepository implements QuotationRepository {
     const list = this.listQuotations().filter((x) => x.id !== q.id);
     list.unshift(q);
     write(KEYS.quotations, list);
+    void saveQuotationToSupabase(q);
   }
 
   deleteQuotation(id: string): void {

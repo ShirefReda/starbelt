@@ -8,10 +8,12 @@ import { Sheet } from "./components/Sheet";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { WhatsappDialog } from "./components/WhatsappDialog";
 import { UpdatesDialog } from "./components/UpdatesDialog";
+import { QuotationsHistoryDialog } from "./components/QuotationsHistoryDialog";
 import { CURRENT_VERSION, markVersionAsSeen, shouldShowUpdatesPrompt } from "./config/version";
 import { exportPdf } from "./pdf/exporter";
 import { requestFocus } from "./state/focusBus";
 import { mergeCompany } from "./config/companyMerge";
+import { saveQuotationToSupabase } from "./services/supabase";
 
 type Toast = { id: number; msg: string; error?: boolean };
 
@@ -20,6 +22,7 @@ export function App() {
   const [zoom, setZoom] = useState(1);
   const [fitMode, setFitMode] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [showWhatsapp, setShowWhatsapp] = useState(false);
   const [showUpdates, setShowUpdates] = useState(() => shouldShowUpdatesPrompt());
   const [hasUnseenUpdate, setHasUnseenUpdate] = useState(() => shouldShowUpdatesPrompt());
@@ -33,8 +36,9 @@ export function App() {
   // Subscribe to the store.
   useEffect(() => store.subscribe(setState), []);
 
-  // ---- Autosave -----------------------------------------------------------
+  // ---- Autosave & Cloud Sync ----------------------------------------------
   const saveTimer = useRef<number | null>(null);
+  const cloudSyncTimer = useRef<number | null>(null);
   useEffect(() => {
     store.patch({ saveStatus: "dirty" });
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
@@ -43,8 +47,20 @@ export function App() {
       repo.saveDraft({ ...q, updatedAt: new Date().toISOString() });
       store.patch({ saveStatus: "saved" });
     }, 500);
+
+    // Debounced cloud sync to Supabase (after typing pauses for 1.5s)
+    if (cloudSyncTimer.current) window.clearTimeout(cloudSyncTimer.current);
+    cloudSyncTimer.current = window.setTimeout(() => {
+      const q = store.get().quotation;
+      if (q.client?.trim()) {
+        repo.saveQuotation(q);
+        void saveQuotationToSupabase(q);
+      }
+    }, 1500);
+
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
+      if (cloudSyncTimer.current) window.clearTimeout(cloudSyncTimer.current);
     };
   }, [state.quotation]);
 
@@ -75,10 +91,15 @@ export function App() {
   // ---- PDF / print --------------------------------------------------------
   const runExport = useCallback(
     async (raster: boolean) => {
+      const current = store.get().quotation;
+      if (current.client?.trim()) {
+        repo.saveQuotation(current);
+        void saveQuotationToSupabase(current);
+      }
       setPdfBusy(true);
       try {
         await exportPdf(
-          store.get().quotation,
+          current,
           {
             onStart: () => setPdfBusy(true),
             onDone: () => setPdfBusy(false),
@@ -132,6 +153,11 @@ export function App() {
   }, []);
 
   const handleNew = useCallback(() => {
+    const current = store.get().quotation;
+    if (current.client?.trim()) {
+      repo.saveQuotation(current);
+      void saveQuotationToSupabase(current);
+    }
     if (confirm(S.confirm.newQuotationMessage)) {
       actions.newQuotation();
       pushToast(S.confirm.newQuotationTitle);
@@ -185,6 +211,7 @@ export function App() {
           zoom={zoom}
           hasUnseenUpdate={hasUnseenUpdate}
           onShowUpdates={handleOpenUpdates}
+          onShowHistory={() => setShowHistory(true)}
           onNew={handleNew}
           onAddItem={handleAddItem}
           onDownloadPdf={handleDownloadPdf}
@@ -253,6 +280,16 @@ export function App() {
           onImportQuotation={handleImportQuotation}
           onToast={pushToast}
           onShowUpdates={handleOpenUpdates}
+        />
+      )}
+
+      {showHistory && (
+        <QuotationsHistoryDialog
+          onClose={() => setShowHistory(false)}
+          onSelectQuotation={(q) => {
+            actions.loadQuotation(q);
+          }}
+          onToast={pushToast}
         />
       )}
 
