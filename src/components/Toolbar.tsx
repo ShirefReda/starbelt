@@ -3,7 +3,6 @@ import type { AppState } from "../state/quotation";
 import { CURRENT_VERSION } from "../config/version";
 import {
   IconAdd,
-  IconFit,
   IconGear,
   IconHistory,
   IconNew,
@@ -64,116 +63,137 @@ export function Toolbar({
   const saveLabel =
     state.saveStatus === "dirty"
       ? S.toolbar.saving
-      : state.saveStatus === "saved"
-        ? S.toolbar.saved
-        : S.toolbar.saved;
+      : S.toolbar.saved;
 
   return (
     <div class="toolbar" role="toolbar" aria-label="شريط الأدوات">
-      <div class="toolbar__brand">
-        <img
-          src={state.company.logo}
-          alt=""
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).style.display = "none";
-          }}
-        />
-        <span class="toolbar__brand-name">{state.company.name}</span>
-      </div>
+      {/* 1. START SECTION: Brand, New, History, Add Item, Undo/Redo */}
+      <div class="toolbar__section toolbar__start">
+        <div class="toolbar__brand" title={state.company.name}>
+          <img
+            src={state.company.logo}
+            alt=""
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+          <span class="toolbar__brand-name">ستار بيلت</span>
+        </div>
 
-      <div class="toolbar__group">
-        <button type="button" class="btn btn--secondary" onClick={onNew} title={S.toolbar.newQuotation}>
-          <IconNew />
-          <span class="btn__label">{S.toolbar.newQuotation}</span>
-        </button>
-        {onShowHistory && (
-          <button type="button" class="btn btn--secondary" onClick={onShowHistory} title="سجل عروض الأسعار السحابي">
-            <IconHistory />
-            <span class="btn__label">سجل العروض</span>
+        <div class="toolbar__group">
+          <button
+            type="button"
+            class="btn btn--secondary"
+            onClick={onNew}
+            title={S.toolbar.newQuotation}
+          >
+            <IconNew />
+            <span class="btn__label">عرض جديد</span>
           </button>
-        )}
-        <button type="button" class="btn btn--add-item" onClick={onAddItem} title={S.toolbar.addItem}>
-          <IconAdd />
-          <span class="btn__label">{S.toolbar.addItem}</span>
-        </button>
+          {onShowHistory && (
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onClick={onShowHistory}
+              title="سجل عروض الأسعار السحابي"
+            >
+              <IconHistory />
+              <span class="btn__label">السجل</span>
+            </button>
+          )}
+          <button
+            type="button"
+            class="btn btn--add-item"
+            onClick={onAddItem}
+            title={S.toolbar.addItem}
+          >
+            <IconAdd />
+            <span class="btn__label">إضافة صنف</span>
+          </button>
+        </div>
+
+        <div class="toolbar__group toolbar__undo-group">
+          <button
+            type="button"
+            class="btn btn--icon"
+            onClick={onUndo}
+            disabled={!canUndo}
+            title={S.toolbar.undo}
+            aria-label={S.toolbar.undo}
+          >
+            <IconUndo />
+          </button>
+          <button
+            type="button"
+            class="btn btn--icon"
+            onClick={onRedo}
+            disabled={!canRedo}
+            title={S.toolbar.redo}
+            aria-label={S.toolbar.redo}
+          >
+            <IconRedo />
+          </button>
+        </div>
       </div>
 
-      <div class="toolbar__group">
-        <button
-          type="button"
-          class="btn btn--icon"
-          onClick={onUndo}
-          disabled={!canUndo}
-          title={S.toolbar.undo}
-          aria-label={S.toolbar.undo}
-        >
-          <IconUndo />
-        </button>
-        <button
-          type="button"
-          class="btn btn--icon"
-          onClick={onRedo}
-          disabled={!canRedo}
-          title={S.toolbar.redo}
-          aria-label={S.toolbar.redo}
-        >
-          <IconRedo />
-        </button>
-      </div>
+      {/* 2. CENTER SECTION: Zoom, Saved Status, Version (Shrinks if screen is tight) */}
+      <div class="toolbar__section toolbar__center">
+        <div class="zoom" role="group" aria-label="تكبير العرض">
+          <button
+            type="button"
+            onClick={onZoomOut}
+            title={S.toolbar.zoomOut}
+            aria-label={S.toolbar.zoomOut}
+          >
+            <IconZoomOut />
+          </button>
+          <button
+            type="button"
+            class="zoom__value zoom__fit-btn"
+            onClick={onFit}
+            title="انقر لملاءمة العرض"
+            aria-label={S.toolbar.fitWidth}
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            type="button"
+            onClick={onZoomIn}
+            title={S.toolbar.zoomIn}
+            aria-label={S.toolbar.zoomIn}
+          >
+            <IconZoomIn />
+          </button>
+        </div>
 
-      <div class="toolbar__spacer" />
-
-      <div class="zoom" role="group" aria-label="تكبير العرض">
-        <button
-          type="button"
-          onClick={onZoomOut}
-          title={S.toolbar.zoomOut}
-          aria-label={S.toolbar.zoomOut}
+        <span
+          class={`saved-pill saved-pill--${state.saveStatus}`}
+          aria-live="polite"
+          role="status"
+          title={saveLabel}
         >
-          <IconZoomOut />
-        </button>
-        <span class="zoom__value" aria-live="polite">
-          {Math.round(zoom * 100)}%
+          <span class="saved-pill__dot" />
+          <span class="saved-pill__label">{saveLabel}</span>
         </span>
+
         <button
           type="button"
-          onClick={onZoomIn}
-          title={S.toolbar.zoomIn}
-          aria-label={S.toolbar.zoomIn}
+          class={`btn-version${hasUnseenUpdate ? " btn-version--has-update" : ""}`}
+          onClick={onShowUpdates}
+          title={S.updates.toolbarTooltip}
         >
-          <IconZoomIn />
-        </button>
-        <button
-          type="button"
-          onClick={onFit}
-          title={S.toolbar.fitWidth}
-          aria-label={S.toolbar.fitWidth}
-        >
-          <IconFit />
+          <IconSparkle size={13} />
+          <span class="btn-version__num">v{CURRENT_VERSION}</span>
+          {hasUnseenUpdate && (
+            <span class="btn-version__badge" title={S.updates.newBadge}>
+              تحديث
+            </span>
+          )}
         </button>
       </div>
 
-      <span class={`saved-pill saved-pill--${state.saveStatus}`} aria-live="polite" role="status">
-        <span class="saved-pill__dot" />
-        <span class="saved-pill__label">{saveLabel}</span>
-      </span>
-
-      <button
-        type="button"
-        class={`btn-version${hasUnseenUpdate ? " btn-version--has-update" : ""}`}
-        onClick={onShowUpdates}
-        title={S.updates.toolbarTooltip}
-      >
-        <IconSparkle size={14} />
-        <span class="btn-version__num">v{CURRENT_VERSION}</span>
-        {hasUnseenUpdate && (
-          <span class="btn-version__badge" title={S.updates.newBadge}>
-            تحديث
-          </span>
-        )}
-      </button>
-
-      <div class="toolbar__group">
+      {/* 3. END SECTION: Action buttons (PDF, WhatsApp, Print, Settings, Clear) ALWAYS VISIBLE AT LEFT */}
+      <div class="toolbar__section toolbar__end">
         <button
           type="button"
           class="btn btn--gold"
@@ -181,7 +201,7 @@ export function Toolbar({
           title={S.toolbar.downloadPdf}
         >
           <IconPdf />
-          <span class="btn__label">{S.toolbar.downloadPdf}</span>
+          <span class="btn__label">تحميل PDF</span>
         </button>
         <button
           type="button"
@@ -190,7 +210,7 @@ export function Toolbar({
           title={S.toolbar.sendWhatsapp}
         >
           <IconWhatsapp />
-          <span class="btn__label">{S.toolbar.sendWhatsapp}</span>
+          <span class="btn__label">واتساب</span>
         </button>
         <button
           type="button"
