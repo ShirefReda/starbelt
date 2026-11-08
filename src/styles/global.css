@@ -45,7 +45,7 @@
   --shadow: 0 2px 8px rgba(20, 32, 63, 0.1);
   --shadow-lg: 0 12px 32px rgba(20, 32, 63, 0.18);
 
-  --toolbar-h: 60px;
+  --toolbar-h: 54px;
 
   font-synthesis-weight: none;
   text-rendering: optimizeLegibility;
@@ -86,27 +86,41 @@ body {
 
 .toolbar {
   min-height: var(--toolbar-h);
+  height: var(--toolbar-h);
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-4);
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+  gap: var(--sp-2);
+  padding: 0 var(--sp-4);
+  background: #ffffff;
   border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
-  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.toolbar::-webkit-scrollbar {
+  height: 3px;
+}
+
+.toolbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
 }
 
 .toolbar__brand {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  padding-inline-end: var(--sp-4);
-  margin-inline-end: var(--sp-2);
+  gap: var(--sp-2);
+  padding-inline-end: var(--sp-3);
+  margin-inline-end: var(--sp-1);
   border-inline-end: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .toolbar__brand img {
-  height: 30px;
+  height: 26px;
   width: auto;
   display: block;
 }
@@ -114,45 +128,45 @@ body {
 .toolbar__brand-name {
   font-weight: 800;
   color: var(--navy);
-  font-size: 15px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
 .toolbar__spacer {
   flex: 1 1 auto;
+  min-width: 8px;
 }
 
 .toolbar__group {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2);
-  height: 38px;
-  padding: 0 var(--sp-4);
-  border-radius: var(--radius);
+  gap: 6px;
+  height: 34px;
+  padding: 0 11px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface);
-  color: var(--text);
+  color: #334155;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.05s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
 }
 
 .btn:hover {
-  background: var(--surface-2);
-  border-color: var(--border-strong);
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 .btn:active {
@@ -160,13 +174,13 @@ body {
 }
 
 .btn:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--focus) 45%, transparent);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 
 .btn svg {
-  width: 17px;
-  height: 17px;
+  width: 15px;
+  height: 15px;
   flex: none;
 }
 
@@ -182,13 +196,54 @@ body {
 }
 
 .btn--gold {
-  background: var(--gold);
-  border-color: var(--gold-600);
-  color: var(--navy-900);
+  background: #f59e0b;
+  border-color: #d97706;
+  color: #0f172a;
+  font-weight: 700;
 }
 
 .btn--gold:hover {
-  background: var(--gold-600);
+  background: #d97706;
+  border-color: #b45309;
+  color: #ffffff;
+}
+
+.btn--whatsapp {
+  background: #10b981;
+  border-color: #059669;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.btn--whatsapp:hover {
+  background: #059669;
+  border-color: #047857;
+  color: #ffffff;
+}
+
+.btn--add-item {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+  font-weight: 700;
+}
+
+.btn--add-item:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #14532d;
+}
+
+.btn--secondary {
+  background: #ffffff;
+  border-color: var(--border);
+  color: #475569;
+}
+
+.btn--secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .btn--ghost {
@@ -202,49 +257,34 @@ body {
 }
 
 .btn--danger {
-  color: #c0392b;
-  background: #fff5f5;
-  border-color: #e5877f;
+  color: #94a3b8;
+  background: #ffffff;
+  border-color: var(--border);
 }
 
 .btn--danger:hover {
-  background: #c0392b;
-  color: #ffffff;
-  border-color: #c0392b;
-  box-shadow: 0 3px 8px rgba(192, 57, 43, 0.35);
-}
-
-.btn--add-item {
-  background: #eef6fd;
-  border-color: #1a6fb0;
-  color: #0b4572;
-  font-weight: 800;
-}
-
-.btn--add-item:hover {
-  background: #125b94;
-  border-color: #125b94;
-  color: #ffffff;
-}
-
-.btn--add-item svg {
-  stroke-width: 2.5;
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fca5a5;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.15);
 }
 
 .btn--icon {
-  width: 38px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   justify-content: center;
+  color: #64748b;
+}
+
+.btn--icon:hover {
+  color: #0f172a;
 }
 
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
-}
-
-.btn:disabled:hover {
-  background: var(--surface);
-  border-color: var(--border);
+  pointer-events: none;
 }
 
 /* ---- WhatsApp picker ---------------------------------------------------- */
@@ -657,47 +697,57 @@ body {
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: var(--surface);
   overflow: hidden;
-  height: 38px;
+  height: 34px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  flex-shrink: 0;
 }
 
 .zoom button {
   border: 0;
   background: transparent;
   height: 100%;
-  width: 34px;
+  width: 30px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
-  color: var(--text);
+  color: #64748b;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.12s ease;
 }
 
 .zoom button:hover {
-  background: var(--surface-2);
+  background: #f1f5f9;
+  color: #0f172a;
 }
 
 .zoom button:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--focus) 45%, transparent);
-  outline-offset: -3px;
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.zoom button svg {
+  width: 14px;
+  height: 14px;
 }
 
 .zoom__value {
-  min-width: 52px;
+  min-width: 44px;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  color: var(--text-muted);
+  color: #475569;
   border-inline: 1px solid var(--border);
   height: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 var(--sp-2);
+  padding: 0 4px;
+  user-select: none;
 }
 
 /* Saved indicator */
@@ -705,31 +755,34 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted);
-  padding: 0 var(--sp-3);
-  height: 38px;
-  border-radius: var(--radius);
-  background: var(--surface-2);
+  color: #64748b;
+  padding: 0 10px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
   border: 1px solid var(--border);
   white-space: nowrap;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  flex-shrink: 0;
 }
 
 .saved-pill__dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--success);
+  background: #10b981;
   transition: background 0.2s ease;
 }
 
 .saved-pill--dirty .saved-pill__dot {
-  background: var(--gold);
+  background: #f59e0b;
 }
 
 .saved-pill--idle .saved-pill__dot {
-  background: var(--text-faint);
+  background: #cbd5e1;
 }
 
 /* ---- Workspace ----------------------------------------------------------- */
@@ -1082,24 +1135,44 @@ body {
 
 /* ---- Responsive ---------------------------------------------------------- */
 
-@media (max-width: 720px) {
-  .toolbar {
-    gap: var(--sp-2);
-    padding: var(--sp-2);
+@media (max-width: 1250px) {
+  .btn--secondary .btn__label {
+    display: none;
   }
+  .btn--secondary {
+    padding: 0 9px;
+  }
+}
 
+@media (max-width: 1024px) {
   .toolbar__brand-name {
     display: none;
   }
+}
 
+@media (max-width: 820px) {
   .btn span.btn__label {
     display: none;
   }
-
   .btn {
-    padding: 0 var(--sp-3);
+    padding: 0 9px;
   }
+  .saved-pill__label {
+    display: none;
+  }
+  .saved-pill {
+    padding: 0 8px;
+  }
+}
 
+@media (max-width: 600px) {
+  .toolbar {
+    gap: 4px;
+    padding: 0 8px;
+  }
+  .zoom {
+    display: none;
+  }
   .workspace {
     padding-inline: var(--sp-2);
   }
@@ -1126,34 +1199,32 @@ body {
 .btn-version {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 38px;
-  padding: 0 10px;
-  border-radius: var(--radius);
+  gap: 5px;
+  height: 34px;
+  padding: 0 9px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: #f8fafc;
   color: var(--navy);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
   position: relative;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.05s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  flex-shrink: 0;
+  transition: all 0.15s ease;
 }
 
 .btn-version:hover {
-  background: var(--surface-2);
-  border-color: var(--navy-700);
-  box-shadow: var(--shadow-sm);
+  background: #ffffff;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .btn-version svg {
-  color: var(--gold-600);
+  color: #d97706;
   flex-shrink: 0;
 }
 
@@ -1171,15 +1242,15 @@ body {
 }
 
 .btn-version__num {
-  font-family: "Tajawal", monospace, sans-serif;
+  font-family: inherit;
   color: var(--navy);
   font-weight: 800;
 }
 
 .btn-version--has-update {
-  border-color: var(--gold);
-  background: color-mix(in srgb, var(--gold) 10%, #fff);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 25%, transparent);
+  border-color: #fde68a;
+  background: #fffbeb;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
 }
 
 .btn-version__badge {
@@ -1187,8 +1258,8 @@ body {
   align-items: center;
   padding: 1px 6px;
   border-radius: 999px;
-  background: var(--gold);
-  color: var(--navy-900);
+  background: #f59e0b;
+  color: #ffffff;
   font-size: 10px;
   font-weight: 800;
   animation: pulse-badge 2s infinite ease-in-out;

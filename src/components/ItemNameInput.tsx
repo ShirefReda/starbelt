@@ -30,8 +30,10 @@ interface ItemNameInputProps {
 }
 
 /**
- * Rich item name editor with autocomplete, inline styling, text size, and alignment controls.
- * Optimized for mixed Arabic, English, and technical dimension strings.
+ * Minimalist, elegant item editor.
+ * - While typing: completely clean, never covers previous rows or headers.
+ * - On text selection: floating bubble menu appears for inline bold, small/big text, and dimensions.
+ * - Discreet cell trigger: sleek pill at bottom corner to easily change text side (right/center/left) and size.
  */
 export function ItemNameInput({
   value,
@@ -52,6 +54,8 @@ export function ItemNameInput({
 }: ItemNameInputProps) {
   const [open, setOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [hasSelection, setHasSelection] = useState(false);
+  const [showCellMenu, setShowCellMenu] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [touched, setTouched] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -75,11 +79,24 @@ export function ItemNameInput({
       if (!wrapRef.current?.contains(e.target as Node)) {
         setOpen(false);
         setIsFocused(false);
+        setHasSelection(false);
+        setShowCellMenu(false);
       }
     };
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
+
+  const checkSelection = () => {
+    const el = textareaRef.current;
+    if (!el) {
+      setHasSelection(false);
+      return;
+    }
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? 0;
+    setHasSelection(start !== end && end > start);
+  };
 
   const accept = (name: string) => {
     const formatted = formatArabicMeasurements(name);
@@ -89,7 +106,7 @@ export function ItemNameInput({
   };
 
   /**
-   * Surrounds selected text or toggles item-level formatting
+   * Surrounds selected text with bold or toggles cell bold
    */
   const handleToggleBold = () => {
     const el = textareaRef.current;
@@ -98,7 +115,6 @@ export function ItemNameInput({
     const end = el.selectionEnd ?? 0;
 
     if (start !== end) {
-      // Inline wrap selection
       const selected = value.substring(start, end);
       const isWrapped = selected.startsWith("**") && selected.endsWith("**") && selected.length >= 4;
       const replacement = isWrapped ? selected.slice(2, -2) : `**${selected}**`;
@@ -107,9 +123,9 @@ export function ItemNameInput({
       setTimeout(() => {
         el.focus();
         el.setSelectionRange(start, start + replacement.length);
+        checkSelection();
       }, 0);
     } else {
-      // Toggle whole cell bold
       onBoldChange?.(!bold);
     }
   };
@@ -138,6 +154,7 @@ export function ItemNameInput({
       setTimeout(() => {
         el.focus();
         el.setSelectionRange(start, start + replacement.length);
+        checkSelection();
       }, 0);
     } else {
       onFontSizeChange?.(size);
@@ -158,6 +175,7 @@ export function ItemNameInput({
       el.focus();
       const pos = start + 3;
       el.setSelectionRange(pos, pos);
+      checkSelection();
     }, 0);
   };
 
@@ -230,120 +248,183 @@ export function ItemNameInput({
       data-size={currentFontSize}
       data-bold={bold ? "true" : "false"}
     >
-      {/* Floating Rich Formatting Toolbar (shown when editing/focused) */}
-      {isFocused && (
-        <div class="item-formatting-toolbar no-print" role="toolbar" aria-label="تنسيق النص">
-          <div class="item-tool-group">
-            <button
-              type="button"
-              class={`item-tool-btn${bold ? " is-active" : ""}`}
-              title="خط عريض (Ctrl+B)"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleToggleBold();
-              }}
-            >
-              <IconBold size={13} />
-            </button>
-          </div>
+      {/* 1. SELECTION BUBBLE: Only appears when text is highlighted (Notion/Medium style) */}
+      {hasSelection && (
+        <div class="item-selection-bubble no-print" role="toolbar" aria-label="تنسيق التحديد">
+          <button
+            type="button"
+            class="bubble-btn"
+            title="خط عريض (Bold)"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              handleToggleBold();
+            }}
+          >
+            <IconBold size={13} />
+          </button>
 
-          <div class="item-tool-separator" />
+          <span class="bubble-divider" />
 
-          {/* Size controls */}
-          <div class="item-tool-group">
-            <button
-              type="button"
-              class={`item-tool-btn${currentFontSize === "sm" ? " is-active" : ""}`}
-              title="خط صغير (مواصفات وتفاصيل)"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleSetFontSize("sm");
-              }}
-            >
-              A<sub style={{ fontSize: "8px" }}>-</sub>
-            </button>
-            <button
-              type="button"
-              class={`item-tool-btn${currentFontSize === "md" ? " is-active" : ""}`}
-              title="خط عادي"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleSetFontSize("md");
-              }}
-            >
-              A
-            </button>
-            <button
-              type="button"
-              class={`item-tool-btn${currentFontSize === "lg" ? " is-active" : ""}`}
-              title="خط كبير (عنوان)"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleSetFontSize("lg");
-              }}
-            >
-              A<sup style={{ fontSize: "8px" }}>+</sup>
-            </button>
-          </div>
+          <button
+            type="button"
+            class="bubble-btn"
+            title="خط صغير (مواصفات)"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              handleSetFontSize("sm");
+            }}
+          >
+            A<sub style={{ fontSize: "8px" }}>-</sub>
+          </button>
 
-          <div class="item-tool-separator" />
+          <button
+            type="button"
+            class="bubble-btn"
+            title="خط كبير (عنوان)"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              handleSetFontSize("lg");
+            }}
+          >
+            A<sup style={{ fontSize: "8px" }}>+</sup>
+          </button>
 
-          {/* Alignment controls */}
-          <div class="item-tool-group">
-            <button
-              type="button"
-              class={`item-tool-btn${currentAlign === "right" ? " is-active" : ""}`}
-              title="محاذاة لليمين (عربي)"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onAlignChange?.("right");
-              }}
-            >
-              <IconAlignRight size={13} />
-            </button>
-            <button
-              type="button"
-              class={`item-tool-btn${currentAlign === "center" ? " is-active" : ""}`}
-              title="توسيط"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onAlignChange?.("center");
-              }}
-            >
-              <IconAlignCenter size={13} />
-            </button>
-            <button
-              type="button"
-              class={`item-tool-btn${currentAlign === "left" ? " is-active" : ""}`}
-              title="محاذاة لليسار (English / موديلات)"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onAlignChange?.("left");
-              }}
-            >
-              <IconAlignLeft size={13} />
-            </button>
-          </div>
+          <span class="bubble-divider" />
 
-          <div class="item-tool-separator" />
-
-          {/* Dimension quick insert */}
-          <div class="item-tool-group">
-            <button
-              type="button"
-              class="item-tool-btn"
-              title="رمز الأبعاد (×)"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleInsertDimension();
-              }}
-            >
-              ×
-            </button>
-          </div>
+          <button
+            type="button"
+            class="bubble-btn"
+            title="رمز الأبعاد (×)"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              handleInsertDimension();
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
 
+      {/* 2. DISCREET CELL FORMAT TRIGGER: Sits quietly at the bottom corner, never covers text above */}
+      {isFocused && (
+        <div class="item-cell-format-wrap no-print">
+          <button
+            type="button"
+            class={`item-format-trigger${bold ? " is-bold" : ""}`}
+            title="خيارات محاذاة وحجم الصنف"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setShowCellMenu(!showCellMenu);
+            }}
+          >
+            <span class="format-trigger-label">
+              {currentAlign === "left" ? "يسار ≣" : currentAlign === "center" ? "وسط ≍" : "يمين ≡"}
+            </span>
+            <span class="format-trigger-size">
+              {currentFontSize === "sm" ? "صغير" : currentFontSize === "lg" ? "كبير" : "عادي"}
+            </span>
+            {bold && <span class="format-trigger-bold">B</span>}
+          </button>
+
+          {showCellMenu && (
+            <div class="item-cell-dropdown" onMouseDown={(e) => e.preventDefault()}>
+              <div class="dropdown-row">
+                <span class="dropdown-label">المحاذاة:</span>
+                <div class="dropdown-btn-group">
+                  <button
+                    type="button"
+                    class={`pill-btn${currentAlign === "right" ? " is-active" : ""}`}
+                    title="محاذاة لليمين (عربي)"
+                    onClick={() => {
+                      onAlignChange?.("right");
+                      setShowCellMenu(false);
+                    }}
+                  >
+                    <IconAlignRight size={13} />
+                    <span>يمين</span>
+                  </button>
+                  <button
+                    type="button"
+                    class={`pill-btn${currentAlign === "center" ? " is-active" : ""}`}
+                    title="توسيط"
+                    onClick={() => {
+                      onAlignChange?.("center");
+                      setShowCellMenu(false);
+                    }}
+                  >
+                    <IconAlignCenter size={13} />
+                    <span>وسط</span>
+                  </button>
+                  <button
+                    type="button"
+                    class={`pill-btn${currentAlign === "left" ? " is-active" : ""}`}
+                    title="محاذاة لليسار (English/أرقام)"
+                    onClick={() => {
+                      onAlignChange?.("left");
+                      setShowCellMenu(false);
+                    }}
+                  >
+                    <IconAlignLeft size={13} />
+                    <span>يسار</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="dropdown-row">
+                <span class="dropdown-label">حجم الخط:</span>
+                <div class="dropdown-btn-group">
+                  <button
+                    type="button"
+                    class={`pill-btn${currentFontSize === "sm" ? " is-active" : ""}`}
+                    onClick={() => {
+                      onFontSizeChange?.("sm");
+                      setShowCellMenu(false);
+                    }}
+                  >
+                    صغير
+                  </button>
+                  <button
+                    type="button"
+                    class={`pill-btn${currentFontSize === "md" ? " is-active" : ""}`}
+                    onClick={() => {
+                      onFontSizeChange?.("md");
+                      setShowCellMenu(false);
+                    }}
+                  >
+                    عادي
+                  </button>
+                  <button
+                    type="button"
+                    class={`pill-btn${currentFontSize === "lg" ? " is-active" : ""}`}
+                    onClick={() => {
+                      onFontSizeChange?.("lg");
+                      setShowCellMenu(false);
+                    }}
+                  >
+                    كبير
+                  </button>
+                </div>
+              </div>
+
+              <div class="dropdown-row">
+                <span class="dropdown-label">نمط الخط:</span>
+                <button
+                  type="button"
+                  class={`pill-btn pill-btn--bold${bold ? " is-active" : ""}`}
+                  onClick={() => {
+                    onBoldChange?.(!bold);
+                  }}
+                >
+                  <IconBold size={13} />
+                  <span>خط عريض (Bold)</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. MAIN EDITOR TEXTAREA */}
       <AutoTextarea
         textareaRef={textareaRef}
         class={`${className || ""} item-editor--${currentAlign} item-editor--${currentFontSize}${
@@ -358,6 +439,9 @@ export function ItemNameInput({
         onFocus={() => {
           setIsFocused(true);
         }}
+        onSelect={checkSelection}
+        onMouseUp={checkSelection}
+        onKeyUp={checkSelection}
         onInput={(e) => {
           const v = (e.currentTarget as HTMLTextAreaElement).value;
           onChange(v);
@@ -380,8 +464,13 @@ export function ItemNameInput({
           onCommit?.(cleanItemText(formatted));
           // Delay so clicking toolbar/autocomplete items still registers
           setTimeout(() => {
-            setOpen(false);
-          }, 150);
+            if (!wrapRef.current?.contains(document.activeElement)) {
+              setOpen(false);
+              setHasSelection(false);
+              setIsFocused(false);
+              setShowCellMenu(false);
+            }
+          }, 180);
         }}
       />
 

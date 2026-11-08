@@ -154,3 +154,4 @@ export function FormattedItemText({ item, className, measuring = false }: Format
     </div>
   );
 }
+

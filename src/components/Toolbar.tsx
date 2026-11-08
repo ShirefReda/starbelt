@@ -82,12 +82,12 @@ export function Toolbar({
       </div>
 
       <div class="toolbar__group">
-        <button type="button" class="btn" onClick={onNew} title={S.toolbar.newQuotation}>
+        <button type="button" class="btn btn--secondary" onClick={onNew} title={S.toolbar.newQuotation}>
           <IconNew />
           <span class="btn__label">{S.toolbar.newQuotation}</span>
         </button>
         {onShowHistory && (
-          <button type="button" class="btn" onClick={onShowHistory} title="سجل عروض الأسعار">
+          <button type="button" class="btn btn--secondary" onClick={onShowHistory} title="سجل عروض الأسعار السحابي">
             <IconHistory />
             <span class="btn__label">سجل العروض</span>
           </button>
@@ -155,7 +155,7 @@ export function Toolbar({
 
       <span class={`saved-pill saved-pill--${state.saveStatus}`} aria-live="polite" role="status">
         <span class="saved-pill__dot" />
-        {saveLabel}
+        <span class="saved-pill__label">{saveLabel}</span>
       </span>
 
       <button
@@ -164,14 +164,11 @@ export function Toolbar({
         onClick={onShowUpdates}
         title={S.updates.toolbarTooltip}
       >
-        <IconSparkle />
-        <span class="btn-version__text">
-          <span class="btn-version__label">{S.updates.versionPrefix}</span>
-          <span class="btn-version__num">{CURRENT_VERSION}</span>
-        </span>
+        <IconSparkle size={14} />
+        <span class="btn-version__num">v{CURRENT_VERSION}</span>
         {hasUnseenUpdate && (
           <span class="btn-version__badge" title={S.updates.newBadge}>
-            {S.updates.newBadge}
+            تحديث
           </span>
         )}
       </button>
@@ -188,10 +185,9 @@ export function Toolbar({
         </button>
         <button
           type="button"
-          class="btn"
+          class="btn btn--whatsapp"
           onClick={onSendWhatsapp}
           title={S.toolbar.sendWhatsapp}
-          style={{ background: "var(--success)", borderColor: "var(--success)", color: "#fff" }}
         >
           <IconWhatsapp />
           <span class="btn__label">{S.toolbar.sendWhatsapp}</span>
