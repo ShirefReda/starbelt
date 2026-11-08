@@ -443,15 +443,164 @@ body.is-editing .date-line__input:focus {
   font-weight: 400;
   color: #000;
   padding: 1.2mm 0;
-  text-align: right;
   line-height: 1.55;
   letter-spacing: normal !important;
   word-spacing: normal !important;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-break: normal;
-  direction: rtl;
   unicode-bidi: isolate;
+}
+
+/* Item rich formatting toolbar */
+.item-formatting-toolbar {
+  position: absolute;
+  top: -38px;
+  right: 0;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #1c2c55;
+  color: #ffffff;
+  padding: 3px 6px;
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  font-family: var(--font-body, system-ui, sans-serif);
+  direction: rtl;
+  user-select: none;
+}
+
+.item-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.item-tool-btn {
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.item-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.item-tool-btn.is-active {
+  background: #feba0f;
+  color: #1c2c55;
+}
+
+.item-tool-separator {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.25);
+  margin: 0 4px;
+}
+
+/* Item editor textarea alignment & size classes */
+.item-editor--right {
+  text-align: right !important;
+  direction: rtl !important;
+}
+.item-editor--center {
+  text-align: center !important;
+  direction: auto !important;
+}
+.item-editor--left {
+  text-align: left !important;
+  direction: ltr !important;
+}
+
+.item-editor--sm {
+  font-size: 19px !important;
+  line-height: 1.45 !important;
+}
+.item-editor--md {
+  font-size: 25px !important;
+  line-height: 1.55 !important;
+}
+.item-editor--lg {
+  font-size: 30px !important;
+  line-height: 1.55 !important;
+}
+.item-editor--bold {
+  font-weight: 700 !important;
+}
+
+/* Formatted Item Text (for print, measure & screen) */
+.item-formatted-text {
+  width: 100%;
+  min-height: 8mm;
+  line-height: 1.55;
+  word-break: normal;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.item-align--right {
+  text-align: right !important;
+  direction: rtl !important;
+}
+.item-align--center {
+  text-align: center !important;
+  direction: auto !important;
+}
+.item-align--left {
+  text-align: left !important;
+  direction: ltr !important;
+}
+
+.item-size--sm {
+  font-size: 19px !important;
+  line-height: 1.45 !important;
+}
+.item-size--md {
+  font-size: 25px !important;
+  line-height: 1.55 !important;
+}
+.item-size--lg {
+  font-size: 30px !important;
+  line-height: 1.55 !important;
+}
+
+.item-weight--bold {
+  font-weight: 700 !important;
+}
+
+.item-inline--bold {
+  font-weight: 700 !important;
+}
+.item-inline--sm {
+  font-size: 0.82em !important;
+  opacity: 0.92;
+  display: inline;
+}
+.item-inline--lg {
+  font-size: 1.18em !important;
+  font-weight: 700 !important;
+  display: inline;
+}
+
+.item-bidi-token {
+  display: inline-block;
+  unicode-bidi: isolate;
+  direction: ltr;
+  margin: 0 1px;
 }
 .cell-qty .cell-print,
 .cell-price .cell-print {

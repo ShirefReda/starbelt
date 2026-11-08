@@ -183,5 +183,31 @@ export const IconHistory = ({ size = 17 }: IconProps) => (
   </Svg>
 );
 
+export const IconBold = ({ size = 15 }: IconProps) => (
+  <Svg size={size}>
+    <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" />
+    <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" />
+  </Svg>
+);
+
+export const IconAlignRight = ({ size = 15 }: IconProps) => (
+  <Svg size={size}>
+    <path d="M21 6H3M21 12H9M21 18H7" />
+  </Svg>
+);
+
+export const IconAlignCenter = ({ size = 15 }: IconProps) => (
+  <Svg size={size}>
+    <path d="M18 6H6M21 12H3M18 18H6" />
+  </Svg>
+);
+
+export const IconAlignLeft = ({ size = 15 }: IconProps) => (
+  <Svg size={size}>
+    <path d="M3 6h18M3 12h12M3 18h14" />
+  </Svg>
+);
+
+
 
 

@@ -3,6 +3,7 @@ import type { JSX } from "preact";
 
 interface AutoTextareaProps extends Omit<JSX.TextareaHTMLAttributes<HTMLTextAreaElement>, "value"> {
   value: string;
+  textareaRef?: { current: HTMLTextAreaElement | null };
 }
 
 /**
@@ -10,8 +11,9 @@ interface AutoTextareaProps extends Omit<JSX.TextareaHTMLAttributes<HTMLTextArea
  * thank-you line so long Arabic text never gets a scrollbar and never clips —
  * both on screen and in the printed sheet.
  */
-export function AutoTextarea({ value, onInput, ...rest }: AutoTextareaProps) {
-  const ref = useRef<HTMLTextAreaElement>(null);
+export function AutoTextarea({ value, onInput, textareaRef, ...rest }: AutoTextareaProps) {
+  const localRef = useRef<HTMLTextAreaElement>(null);
+  const ref = textareaRef || localRef;
 
   const resize = () => {
     const el = ref.current;
@@ -20,7 +22,7 @@ export function AutoTextarea({ value, onInput, ...rest }: AutoTextareaProps) {
     el.style.height = `${el.scrollHeight}px`;
   };
 
-  useEffect(resize, [value]);
+  useEffect(resize, [value, rest.style, rest.class]);
 
   return (
     <textarea

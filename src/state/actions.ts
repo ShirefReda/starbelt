@@ -5,7 +5,7 @@
  */
 
 import { Store } from "./store";
-import { SCHEMA_VERSION, emptyQuotation, type AppState, type Quotation } from "./quotation";
+import { SCHEMA_VERSION, emptyQuotation, type AppState, type Quotation, type TextAlignment, type TextFontSize } from "./quotation";
 import { mergeCompany } from "../config/companyMerge";
 import { LocalStorageQuotationRepository } from "../storage/localStorageRepository";
 import { uid, localISODate, displayDate } from "../utils/id";
@@ -73,6 +73,10 @@ export interface SheetActions {
   setApprover(value: string): void;
   setThankYou(value: string): void;
   setItemName(id: string, value: string): void;
+  setItemAlign(id: string, align: TextAlignment): void;
+  setItemFontSize(id: string, fontSize: TextFontSize): void;
+  setItemBold(id: string, bold: boolean): void;
+  toggleItemBold(id: string): void;
   setItemQty(id: string, value: number): void;
   setItemPrice(id: string, value: number): void;
   addItem(): void;
@@ -120,6 +124,42 @@ export const actions: SheetActions = {
         if (item) item.name = value;
       },
       { field: `item-${id}-name` },
+    );
+  },
+  setItemAlign(id, align) {
+    store.commit(
+      (d) => {
+        const item = d.items.find((i) => i.id === id);
+        if (item) item.align = align;
+      },
+      { field: `item-${id}-align` },
+    );
+  },
+  setItemFontSize(id, fontSize) {
+    store.commit(
+      (d) => {
+        const item = d.items.find((i) => i.id === id);
+        if (item) item.fontSize = fontSize;
+      },
+      { field: `item-${id}-fontSize` },
+    );
+  },
+  setItemBold(id, bold) {
+    store.commit(
+      (d) => {
+        const item = d.items.find((i) => i.id === id);
+        if (item) item.bold = bold;
+      },
+      { field: `item-${id}-bold` },
+    );
+  },
+  toggleItemBold(id) {
+    store.commit(
+      (d) => {
+        const item = d.items.find((i) => i.id === id);
+        if (item) item.bold = !item.bold;
+      },
+      { field: `item-${id}-bold` },
     );
   },
   setItemQty(id, value) {

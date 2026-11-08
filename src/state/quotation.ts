@@ -8,11 +8,17 @@
 import type { CompanyConfig } from "../config/company";
 import { displayDate } from "../utils/id";
 
+export type TextAlignment = "right" | "center" | "left";
+export type TextFontSize = "sm" | "md" | "lg";
+
 export interface QuoteItem {
   id: string;
   name: string;
   qty: number;
   price: number;
+  align?: TextAlignment;
+  fontSize?: TextFontSize;
+  bold?: boolean;
 }
 
 export interface QuoteNote {

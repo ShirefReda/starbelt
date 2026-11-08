@@ -9,6 +9,7 @@ import { t, S } from "../i18n/strings";
 import { CONTENT_H, CONTENT_W } from "../utils/geometry";
 import { paginateRows } from "../utils/pagination";
 import { formatArabicMeasurements } from "../utils/textFormatter";
+import { FormattedItemText } from "../utils/itemFormatter";
 import { AutoTextarea } from "./AutoTextarea";
 import { NumericInput } from "./NumericInput";
 import { ItemNameInput } from "./ItemNameInput";
@@ -176,7 +177,7 @@ export function Sheet({ state, zoom }: SheetProps) {
               <tr key={item.id} data-measure-row={i}>
                 <td class="cell-num">{i + 1}</td>
                 <td class="cell-item">
-                  <div class="item-editor">{formatArabicMeasurements(item.name) || "‏"}</div>
+                  <FormattedItemText item={item} measuring />
                 </td>
                 <td class="cell-qty">{formatInt(item.qty)}</td>
                 <td class="cell-price">{formatMoney(item.price)}</td>
@@ -517,22 +518,28 @@ function ItemRow({ item, index, itemNames }: ItemRowProps) {
           </button>
         </div>
       </td>
-      <td class="cell-item">
+      <td class="cell-item" data-align={item.align || "right"} data-size={item.fontSize || "md"}>
         <span class="cell-screen">
           <ItemNameInput
             class="item-editor"
             value={item.name}
+            align={item.align}
+            fontSize={item.fontSize}
+            bold={item.bold}
             names={itemNames}
             ariaLabel={S.sheet.colItem}
             dataRow={index}
             dataCell="item"
             onChange={(v) => actions.setItemName(item.id, v)}
+            onAlignChange={(a) => actions.setItemAlign(item.id, a)}
+            onFontSizeChange={(s) => actions.setItemFontSize(item.id, s)}
+            onBoldChange={(b) => actions.setItemBold(item.id, b)}
             onCommit={(v) => actions.rememberItemName(v)}
             onEnter={() => enter("qty")}
           />
         </span>
-        <span class="cell-print" dir="rtl">
-          {formatArabicMeasurements(item.name) || "‏"}
+        <span class="cell-print" dir={item.align === "left" ? "ltr" : "rtl"}>
+          <FormattedItemText item={item} />
         </span>
       </td>
       <td class="cell-qty">
