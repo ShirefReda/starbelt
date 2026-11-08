@@ -3,8 +3,13 @@ import type { Quotation } from "../state/quotation";
 import { computeTotals } from "../utils/totals";
 import { migrateQuotation } from "../state/quotation";
 
-const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() ?? "";
-const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim() ?? "";
+const supabaseUrl =
+  (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() ||
+  "https://xzbjxhuvjbiucbtjwpbv.supabase.co";
+
+const supabaseAnonKey =
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim() ||
+  "sb_publishable_QRmU1-08UfRJaAbmiAXCgw_Xvwmd86K";
 
 export const isSupabaseConfigured = (): boolean => {
   return Boolean(supabaseUrl && supabaseAnonKey);
