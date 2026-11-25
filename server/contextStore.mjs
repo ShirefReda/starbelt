@@ -39,6 +39,7 @@ export function normalizeMessageRecord(raw, sentMessageIds = null) {
 
   const key = raw.key || {};
   const remoteJid = key.remoteJid || raw.remoteJid || "";
+  const remoteJidAlt = key.remoteJidAlt || raw.remoteJidAlt || "";
   const id = key.id || raw.id || "";
   const fromMe = Boolean(key.fromMe ?? raw.fromMe);
   const participant = key.participant || raw.participant || "";
@@ -53,6 +54,7 @@ export function normalizeMessageRecord(raw, sentMessageIds = null) {
   return {
     id: id || `${remoteJid}:${timestamp}:${details.text.slice(0, 24)}`,
     remoteJid,
+    remoteJidAlt,
     fromMe,
     isFathy,
     participant,
@@ -190,29 +192,34 @@ export class ChatContextStore {
   /**
    * Merge live Evolution API history + passive in-memory buffer, deduplicate,
    * sort chronologically, and return the full conversation history.
+   * Accepts messages matching either remoteJid or remoteJidAlt (for WhatsApp @lid chats).
    * @param {string} remoteJid
    * @param {any[]} [evolutionRawRecords]
    * @param {any} [latestMsg]
+   * @param {string} [remoteJidAlt]
    */
-  mergeHistory(remoteJid, evolutionRawRecords = [], latestMsg = null) {
+  mergeHistory(remoteJid, evolutionRawRecords = [], latestMsg = null, remoteJidAlt = "") {
+    const allowedJids = new Set([remoteJid, remoteJidAlt].filter(Boolean));
     const byId = new Map();
 
     // 1. Evolution API historical records
     for (const raw of evolutionRawRecords) {
       const norm = normalizeMessageRecord(raw, this.sentMessageIds);
-      if (norm && norm.remoteJid === remoteJid) {
+      if (norm && (allowedJids.has(norm.remoteJid) || allowedJids.has(norm.remoteJidAlt))) {
         byId.set(norm.id, norm);
       }
     }
 
-    // 2. Passive rolling buffer (may have brand-new messages or pushNames Evolution hasn't flushed)
-    const buffered = this.buffers.get(remoteJid) || [];
-    for (const item of buffered) {
-      byId.set(item.id, item);
+    // 2. Passive rolling buffer (check both primary and alt JIDs)
+    for (const jidKey of allowedJids) {
+      const buffered = this.buffers.get(jidKey) || [];
+      for (const item of buffered) {
+        byId.set(item.id, item);
+      }
     }
 
     // 3. Ensure latest triggering message is included
-    if (latestMsg && latestMsg.remoteJid === remoteJid) {
+    if (latestMsg && (allowedJids.has(latestMsg.remoteJid) || allowedJids.has(latestMsg.remoteJidAlt))) {
       byId.set(latestMsg.id, latestMsg);
     }
 

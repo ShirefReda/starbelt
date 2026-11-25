@@ -147,7 +147,10 @@ export class FathyAgent {
       return { skipped: true, reason: "non_text_or_empty" };
     }
 
-    const { remoteJid, text, fromMe, id, pushName, quotedIsFathy } = normalized;
+    const { remoteJid, remoteJidAlt, text, fromMe, id, pushName, quotedIsFathy } = normalized;
+    // Evolution API v2 @lid fix: prefer remoteJidAlt (@s.whatsapp.net) when replying to @lid chats
+    const replyTarget =
+      remoteJid.endsWith("@lid") && remoteJidAlt ? remoteJidAlt : remoteJid;
 
     // Always buffer passively so full chat context stays up-to-date
     this.contextStore.recordMessage(normalized);
@@ -169,7 +172,7 @@ export class FathyAgent {
       const byeText = this.formatOutgoingReply(
         "تمام، أنا هاقف دلوقتي 👌 وقت ما تحتاجني تاني نادي عليّا بـ *فتحي* أو *Fathy* وهكون معاك فوراً.",
       );
-      await this.sendAndTrack(remoteJid, byeText, rawRecord.key);
+      await this.sendAndTrack(remoteJid, replyTarget, byeText, rawRecord.key);
       return { replied: true, action: "session_deactivated" };
     }
 
@@ -188,18 +191,30 @@ export class FathyAgent {
     this.contextStore.activateSession(remoteJid, pushName || (fromMe ? "owner" : ""));
 
     // Immediately show "typing..." indicator on WhatsApp
-    void this.evolution.sendTyping(remoteJid, 5000);
+    void this.evolution.sendTyping(replyTarget, 5000);
 
-    // Pull FULL chat context from Evolution API + merge with passive buffer
-    const evoHistory = await this.evolution.fetchChatHistory(
+    // Pull FULL chat context from Evolution API (both primary JID and alt JID if @lid) + merge with passive buffer
+    const primaryEvoHistory = await this.evolution.fetchChatHistory(
       remoteJid,
       this.config.maxHistoryMessages,
     );
-    const fullHistory = this.contextStore.mergeHistory(remoteJid, evoHistory, normalized);
+    const altEvoHistory =
+      remoteJidAlt && remoteJidAlt !== remoteJid
+        ? await this.evolution.fetchChatHistory(
+            remoteJidAlt,
+            Math.min(50, this.config.maxHistoryMessages),
+          )
+        : [];
+    const fullHistory = this.contextStore.mergeHistory(
+      remoteJid,
+      [...primaryEvoHistory, ...altEvoHistory],
+      normalized,
+      remoteJidAlt,
+    );
 
     // Build LLM messages from the ENTIRE merged conversation history
     const llmMessages = this.contextStore.buildLlmMessages(fullHistory, {
-      remoteJid,
+      remoteJid: replyTarget,
       isGroup,
     });
 
@@ -213,13 +228,13 @@ export class FathyAgent {
       : "";
 
     console.log(
-      `[Fathy] Triggered in ${remoteJid} (${isGroup ? "group" : "dm"}, fromMe=${fromMe}) | context=${fullHistory.length} msgs (${llmMessages.length} turns)`,
+      `[Fathy] Triggered in ${remoteJid} (replyTo=${replyTarget}, ${isGroup ? "group" : "dm"}, fromMe=${fromMe}) | context=${fullHistory.length} msgs (${llmMessages.length} turns)`,
     );
 
     const aiResult = await this.aiClient.generateReply({
       messages: llmMessages,
       isGroup,
-      remoteJid,
+      remoteJid: replyTarget,
       quotationsSummary,
     });
 
@@ -229,14 +244,14 @@ export class FathyAgent {
         i === 0
           ? this.formatOutgoingReply(chunks[i])
           : `${chunks[i]}${FATHY_SIGNATURE_MARKER}`;
-      await this.sendAndTrack(remoteJid, formatted, i === 0 ? rawRecord.key : null);
+      await this.sendAndTrack(remoteJid, replyTarget, formatted, i === 0 ? rawRecord.key : null);
     }
 
     this.stats.repliesSent++;
     this.stats.lastReplyAt = new Date().toISOString();
 
     console.log(
-      `[Fathy] Replied in ${remoteJid} via ${aiResult.provider}/${aiResult.model} in ${aiResult.latencyMs}ms`,
+      `[Fathy] Replied in ${replyTarget} via ${aiResult.provider}/${aiResult.model} in ${aiResult.latencyMs}ms`,
     );
 
     return {
@@ -248,15 +263,26 @@ export class FathyAgent {
     };
   }
 
-  async sendAndTrack(remoteJid, formattedText, quotedKey) {
-    const sent = await this.evolution.sendText(remoteJid, formattedText, quotedKey);
+  async sendAndTrack(bufferJid, replyTarget, formattedText, quotedKey) {
+    let sent;
+    try {
+      sent = await this.evolution.sendText(replyTarget, formattedText, quotedKey);
+    } catch (err) {
+      // Fallback: if replyTarget differed from bufferJid (e.g. @lid vs @s.whatsapp.net), retry with bufferJid
+      if (replyTarget !== bufferJid) {
+        sent = await this.evolution.sendText(bufferJid, formattedText, quotedKey);
+      } else {
+        throw err;
+      }
+    }
     if (sent?.messageId) {
       this.contextStore.markSentByFathy(sent.messageId);
     }
     // Also record Fathy's reply immediately into the rolling buffer
     this.contextStore.recordMessage({
       id: sent?.messageId || `fathy:${Date.now()}`,
-      remoteJid,
+      remoteJid: bufferJid,
+      remoteJidAlt: replyTarget !== bufferJid ? replyTarget : "",
       fromMe: true,
       isFathy: true,
       participant: "",

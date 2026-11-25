@@ -45,25 +45,27 @@ function splitCsv(raw) {
 
 const DEFAULT_UNOROUTER_MODELS = [
   "gemini-3.6-flash:free",
-  "gpt-6-luna:free",
   "gpt-4o:free",
+  "gpt-6-luna:free",
+  "mistral-small:free",
   "nemotron-3-ultra-550b-a55b:free",
   "deepseek-v4.1-flash:free",
-  "step-5-preview:free",
-  "minimax-m3.1-flash:free",
+  "llama-3.1-8b:free",
   "qwen2.5-coder-32b:free",
+  "minimax-m3.1-flash:free",
   "glm-5.3-flash:free",
   "gemma-4-31b-it:free",
 ];
 
 const DEFAULT_LOGFARE_MODELS = [
-  "openai/gpt-6-luna",
   "deepseek-v4.1-flash",
-  "stepfun-ai/step-5-preview",
+  "openai/gpt-6-luna",
+  "logfare/auto",
   "qwen-3.8-27b",
+  "tencent/hy4",
+  "minimax-m3.1-flash",
   "grok-4.7",
   "kimi-k3.1-pro",
-  "minimax-m3.1-flash",
   "glm-5.3-flash",
 ];
 
@@ -116,7 +118,8 @@ export function buildProviderChain(env = process.env) {
     chain.push({ provider, baseUrl, apiKey, model, defaultCooldownSec });
   };
 
-  // Interleave UnoRouter and Logfare so rate limits on one provider seamlessly switch to the other
+  // Interleave UnoRouter (ultra-fast 2-4s non-reasoning models) with Logfare (Premium 40 req/min reasoning models)
+  // Parallel racing in aiClient pairs 1 UnoRouter + 1 Logfare route simultaneously so the fastest responder wins!
   const maxLen = Math.max(unorouterModels.length, effectiveLogfareModels.length);
   for (let i = 0; i < maxLen; i++) {
     if (unorouterKey && unorouterModels[i]) {
@@ -129,12 +132,18 @@ export function buildProviderChain(env = process.env) {
 
   // Fallback to generic OPENAI_API_KEY / AI_API_KEY if neither dedicated key was configured
   if (chain.length === 0 && genericKey && genericUrl) {
+    const isLogfareGeneric = genericUrl.toLowerCase().includes("logfare.ai");
+    const explicitModels = splitCsv(
+      env.MODEL_FALLBACK_CHAIN || env.FALLBACK_MODELS || env.AI_MODEL_PRIMARY,
+    );
     const genericModels =
-      splitCsv(env.MODEL_FALLBACK_CHAIN || env.FALLBACK_MODELS).length > 0
-        ? splitCsv(env.MODEL_FALLBACK_CHAIN || env.FALLBACK_MODELS)
-        : [env.PRIMARY_MODEL || env.MODEL || "gemini-3.6-flash:free"];
+      explicitModels.length > 0
+        ? explicitModels
+        : isLogfareGeneric
+          ? DEFAULT_LOGFARE_MODELS
+          : [env.PRIMARY_MODEL || env.MODEL || "gemini-3.6-flash:free"];
     for (const model of genericModels) {
-      pushRoute("openai-compat", genericUrl, genericKey, model, 30);
+      pushRoute(isLogfareGeneric ? "logfare" : "openai-compat", genericUrl, genericKey, model, 30);
     }
   }
 

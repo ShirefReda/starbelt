@@ -278,7 +278,62 @@ describe("Fathy AI Full Chat Context & Orchestration", () => {
     expect(chain[0]?.provider).toBe("unorouter");
     expect(chain[0]?.model).toBe("gemini-3.6-flash:free");
     expect(chain[1]?.provider).toBe("logfare");
-    expect(chain[1]?.model).toBe("openai/gpt-6-luna");
+    expect(chain[1]?.model).toBe("deepseek-v4.1-flash");
+
+    // Generic AI_BASE_URL=logfare.ai must pick Logfare models (never gemini-3.6-flash:free)
+    const genericLogfare = buildProviderChain({
+      AI_BASE_URL: "https://logfare.ai/v1",
+      AI_API_KEY: "lfu-generic",
+    });
+    expect(genericLogfare[0]?.provider).toBe("logfare");
+    expect(genericLogfare[0]?.model).toBe("deepseek-v4.1-flash");
+  });
+
+  it("routes replies to remoteJidAlt when incoming message uses WhatsApp @lid", async () => {
+    const sentTargets: string[] = [];
+    const mockEvolution = {
+      isConfigured: () => true,
+      sendTyping: vi.fn().mockResolvedValue(undefined),
+      fetchChatHistory: vi.fn().mockResolvedValue([]),
+      sendText: vi.fn().mockImplementation(async (to: string) => {
+        sentTargets.push(to);
+        return { messageId: "LID-REPLY-1" };
+      }),
+    };
+    const mockAiClient = {
+      lastSuccess: null,
+      generateReply: vi.fn().mockResolvedValue({
+        text: "أهلاً بك يا هندسة!",
+        provider: "logfare",
+        model: "openai/gpt-6-luna",
+        latencyMs: 900,
+      }),
+    };
+    const store = new ChatContextStore();
+    const agent = new FathyAgent({
+      config: { evolutionInstance: "starbelt", maxHistoryMessages: 50, providers: [] },
+      evolution: mockEvolution,
+      contextStore: store,
+      aiClient: mockAiClient,
+    });
+
+    await agent.handleWebhookPayload({
+      event: "messages.upsert",
+      instance: "starbelt",
+      data: {
+        key: {
+          id: "lid-msg-1",
+          remoteJid: "83515756548312@lid",
+          remoteJidAlt: "201012345678@s.whatsapp.net",
+          fromMe: false,
+        },
+        pushName: "م. شريف",
+        messageTimestamp: 1700000100,
+        message: { conversation: "يا فتحي ازيك" },
+      },
+    });
+
+    expect(sentTargets).toEqual(["201012345678@s.whatsapp.net"]);
   });
 
   it("tracks per-model cooldowns in FathyAiClient", () => {
