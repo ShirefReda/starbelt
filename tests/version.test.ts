@@ -17,25 +17,26 @@ describe("Versioning & Changelog System", () => {
   });
 
   it("CURRENT_VERSION matches the latest release version in APP_VERSIONS", () => {
-    expect(CURRENT_VERSION).toBe("1.3.0");
+    expect(CURRENT_VERSION).toBe("1.4.0");
     expect(APP_VERSIONS.length).toBeGreaterThan(0);
     expect(APP_VERSIONS[0]?.version).toBe(CURRENT_VERSION);
   });
 
   it("getLatestVersion returns the current release with title and changes", () => {
     const latest = getLatestVersion();
-    expect(latest.version).toBe("1.3.0");
+    expect(latest.version).toBe("1.4.0");
     expect(latest.title).toBeTruthy();
     expect(latest.changes.length).toBeGreaterThan(0);
   });
 
-  it("includes required bug fixes (خطأ في التسعير and خطأ في كتابة الأصناف)", () => {
-    const latest = getLatestVersion();
-    const bugChanges = latest.changes.filter((c) => c.category === "bug");
-    expect(bugChanges.length).toBeGreaterThanOrEqual(2);
+  it("preserves historical bug fixes (خطأ في التسعير and خطأ في كتابة الأصناف) in APP_VERSIONS", () => {
+    const allBugChanges = APP_VERSIONS.flatMap((v) => v.changes).filter(
+      (c) => c.category === "bug",
+    );
+    expect(allBugChanges.length).toBeGreaterThanOrEqual(2);
 
-    const hasPricingBug = bugChanges.some((c) => c.text.includes("خطأ في التسعير"));
-    const hasItemsBug = bugChanges.some((c) => c.text.includes("خطأ في كتابة الأصناف"));
+    const hasPricingBug = allBugChanges.some((c) => c.text.includes("خطأ في التسعير"));
+    const hasItemsBug = allBugChanges.some((c) => c.text.includes("خطأ في كتابة الأصناف"));
 
     expect(hasPricingBug).toBe(true);
     expect(hasItemsBug).toBe(true);

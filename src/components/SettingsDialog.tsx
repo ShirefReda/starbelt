@@ -1,4 +1,4 @@
-import { useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { AppState, Quotation } from "../state/quotation";
 import { S } from "../i18n/strings";
 import { companyDefaults } from "../config/company";
@@ -6,6 +6,28 @@ import { diffCompany } from "../config/companyMerge";
 import { CURRENT_VERSION } from "../config/version";
 import { repo, actions } from "../state/actions";
 import { IconClose, IconSparkle } from "./icons";
+
+interface FathyHealthData {
+  ok: boolean;
+  ownerNumber?: string;
+  evolution?: {
+    configured: boolean;
+    instance: string;
+    webhookUrl: string;
+  };
+  ai?: {
+    configuredRoutes: number;
+    providers: string[];
+  };
+  context?: {
+    bufferedChats: number;
+    activeSessions: number;
+  };
+  stats?: {
+    repliesSent: number;
+    webhooksReceived: number;
+  };
+}
 
 interface SettingsDialogProps {
   state: AppState;
@@ -29,6 +51,43 @@ export function SettingsDialog({
   const [draft, setDraft] = useState(state.company);
   const [options, setOptions] = useState(state.quotation.options);
   const importRef = useRef<HTMLInputElement>(null);
+  const [fathyHealth, setFathyHealth] = useState<FathyHealthData | null>(null);
+  const [fathyBusy, setFathyBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/fathy/health")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (active && data && data.ok) setFathyHealth(data as FathyHealthData);
+      })
+      .catch(() => {
+        // Offline or static preview without backend
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleActivateFathyWebhook = async () => {
+    setFathyBusy(true);
+    try {
+      const res = await fetch("/api/fathy/setup-webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string; webhookUrl?: string };
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "تعذر تفعيل Webhook فتحي");
+      }
+      onToast("تم ربط وتفعيل مساعد فتحي AI على واتساب بنجاح ✅");
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "تعذر تفعيل Webhook فتحي", true);
+    } finally {
+      setFathyBusy(false);
+    }
+  };
 
   const update = (key: keyof typeof companyDefaults, value: string | string[] | unknown) => {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -467,6 +526,38 @@ export function SettingsDialog({
                   (e.currentTarget as HTMLInputElement).value = "";
                 }}
               />
+            </div>
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset__legend">مساعد فتحي AI — واتساب (01208840531)</legend>
+            <div class="settings-version-box" style={{ flexWrap: "wrap", gap: "10px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "13px" }}>
+                <div style={{ fontWeight: 700, color: "var(--navy)" }}>
+                  {fathyHealth
+                    ? fathyHealth.evolution?.configured && (fathyHealth.ai?.configuredRoutes ?? 0) > 0
+                      ? "🟢 متصل وجاهز — نادي (فتحي / فتحى / Fathy) في أي محادثة"
+                      : "🟡 الخادم يعمل — يرجى التأكد من مفاتيح البيئة في Coolify"
+                    : "⚪ متاح عند التشغيل عبر خادم Coolify"}
+                </div>
+                {fathyHealth && (
+                  <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                    النماذج المتاحة: {fathyHealth.ai?.configuredRoutes ?? 0} | محادثات نشطة:{" "}
+                    {fathyHealth.context?.activeSessions ?? 0} | ردود مرسلة:{" "}
+                    {fathyHealth.stats?.repliesSent ?? 0}
+                  </div>
+                )}
+              </div>
+              {fathyHealth && (
+                <button
+                  type="button"
+                  class="btn btn--secondary"
+                  disabled={fathyBusy || !fathyHealth.evolution?.configured}
+                  onClick={() => void handleActivateFathyWebhook()}
+                >
+                  {fathyBusy ? "جارٍ التفعيل…" : "تفعيل Webhook واتساب"}
+                </button>
+              )}
             </div>
           </fieldset>
 
