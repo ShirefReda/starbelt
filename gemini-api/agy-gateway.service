@@ -1,0 +1,28 @@
+[Unit]
+Description=Private Single-User Local Gateway for official agy CLI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agy-gateway
+Group=agy-gateway
+WorkingDirectory=/srv/agy-gateway
+EnvironmentFile=/etc/agy-gateway/env
+ExecStart=/srv/agy-gateway/.venv/bin/python /srv/agy-gateway/gateway.py
+Restart=on-failure
+RestartSec=3
+
+# Hardening without blocking `agy` from reaching its own user home directory
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/agy-workspace /home/agy-gateway
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+LockPersonality=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target
