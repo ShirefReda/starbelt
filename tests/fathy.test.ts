@@ -10,7 +10,11 @@ import {
 import { ChatContextStore, normalizeMessageRecord } from "../server/contextStore.mjs";
 import { FathyAiClient, cleanAssistantReply } from "../server/aiClient.mjs";
 import { FathyAgent, splitWhatsAppMessage } from "../server/fathyAgent.mjs";
-import { buildProviderChain, isLoopbackGatewayUrl } from "../server/config.mjs";
+import {
+  buildProviderChain,
+  isLoopbackGatewayUrl,
+  normalizeGroqBaseUrl,
+} from "../server/config.mjs";
 import {
   buildQuotationFromDraft,
   buildQuotationShareUrl,
@@ -274,11 +278,28 @@ describe("Fathy AI Full Chat Context & Orchestration", () => {
     expect(store.isSessionActive(jid)).toBe(false);
   });
 
-  it("cleans thinking tags, splits long WhatsApp messages, and builds Gemini-only provider chain", () => {
+  it("cleans thinking tags, splits long WhatsApp messages, and puts Groq qwen/qwen3.8-27b on top", () => {
     expect(cleanAssistantReply("<think>internal thoughts</think> أهلاً بك!")).toBe("أهلاً بك!");
     expect(splitWhatsAppMessage("A".repeat(4000), 1500).length).toBeGreaterThanOrEqual(3);
 
-    // Official Gemini API key
+    // Groq base URL normalization
+    expect(normalizeGroqBaseUrl("https://api.groq.com")).toBe("https://api.groq.com/openai/v1");
+    expect(normalizeGroqBaseUrl("https://api.groq.com/openai")).toBe("https://api.groq.com/openai/v1");
+    expect(normalizeGroqBaseUrl("https://api.groq.com/openai/v1/")).toBe("https://api.groq.com/openai/v1");
+
+    // Groq MUST be #1 on top even when Gemini is also configured
+    const groqTopChain = buildProviderChain({
+      GROQ_API_KEY: "gsk-test-key",
+      GROQ_BASE_URL: "https://api.groq.com",
+      GEMINI_API_KEY: "AIza-test-key",
+    });
+    expect(groqTopChain[0]?.provider).toBe("groq");
+    expect(groqTopChain[0]?.model).toBe("qwen/qwen3.8-27b");
+    expect(groqTopChain[0]?.baseUrl).toBe("https://api.groq.com/openai/v1");
+    expect(groqTopChain[1]?.provider).toBe("groq");
+    expect(groqTopChain[1]?.model).toBe("openai/gpt-oss-120b");
+
+    // Official Gemini API key alone
     const geminiApiChain = buildProviderChain({
       GEMINI_API_KEY: "AIza-test-key",
     });

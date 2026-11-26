@@ -269,7 +269,7 @@ export class FathyAiClient {
   async runWithRoutes(fullMessages, { temperature = 0.55, validate = null } = {}) {
     if (!this.providers || this.providers.length === 0) {
       throw new Error(
-        "No Gemini backend configured. Set GEMINI_API_KEY (for cloud/multi-user) or AGY_GATEWAY_URL + AGY_GATEWAY_TOKEN (for local 127.0.0.1 single-user gateway).",
+        "No AI backend configured. Set GROQ_API_KEY (recommended, qwen/qwen3.8-27b on top) or GEMINI_API_KEY.",
       );
     }
 

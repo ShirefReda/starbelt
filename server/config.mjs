@@ -43,8 +43,27 @@ function splitCsv(raw) {
     .filter(Boolean);
 }
 
+const DEFAULT_GROQ_MODELS = [
+  "qwen/qwen3.8-27b",
+  "openai/gpt-oss-120b",
+  "openai/gpt-oss-20b",
+];
 const DEFAULT_GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
 const DEFAULT_GATEWAY_MODEL = "gemini-3.8-flash-medium";
+
+/**
+ * Normalize Groq base URL so `https://api.groq.com`, `https://api.groq.com/openai`,
+ * and `https://api.groq.com/openai/v1` all resolve cleanly to `https://api.groq.com/openai/v1`.
+ */
+export function normalizeGroqBaseUrl(rawUrl) {
+  const cleaned = String(rawUrl || "https://api.groq.com/openai/v1")
+    .trim()
+    .replace(/\/+$/, "");
+  if (!cleaned) return "https://api.groq.com/openai/v1";
+  if (/\/v1$/i.test(cleaned)) return cleaned;
+  if (/\/openai$/i.test(cleaned)) return `${cleaned}/v1`;
+  return `${cleaned}/openai/v1`;
+}
 
 /**
  * Strictly verify that the private `agy` gateway URL is loopback-only
@@ -63,9 +82,10 @@ export function isLoopbackGatewayUrl(rawUrl) {
 }
 
 /**
- * Build the Gemini-only AI route list:
- * 1. Official Google Gemini API (`GEMINI_API_KEY`) — recommended for multi-user / Coolify deployment.
- * 2. Private single-user local `gemini-api/gateway.py` (`AGY_GATEWAY_URL` + `AGY_GATEWAY_TOKEN`),
+ * Build the prioritized AI route list:
+ * 1. VERY TOP: Groq (`GROQ_API_KEY`, default #1 model `qwen/qwen3.8-27b`, sub-second inference)
+ * 2. Official Google Gemini API (`GEMINI_API_KEY`) — optional fallback for cloud/multi-user
+ * 3. Private single-user local `gemini-api/gateway.py` (`AGY_GATEWAY_URL` + `AGY_GATEWAY_TOKEN`),
  *    strictly loopback-only (`127.0.0.1`) for single-user personal operation.
  */
 export function buildProviderChain(env = process.env) {
@@ -80,7 +100,19 @@ export function buildProviderChain(env = process.env) {
     chain.push({ provider, baseUrl, apiKey, model, defaultCooldownSec });
   };
 
-  // 1. Official Google Gemini API (AI Studio / Vertex OpenAI-compatible endpoint)
+  // 1. VERY TOP: Groq (`qwen/qwen3.8-27b` first, then `openai/gpt-oss-120b`, `openai/gpt-oss-20b`)
+  const groqKey = (env.GROQ_API_KEY || "").trim();
+  const groqUrl = normalizeGroqBaseUrl(env.GROQ_BASE_URL || "https://api.groq.com/openai/v1");
+  const groqModels =
+    splitCsv(env.GROQ_MODELS).length > 0 ? splitCsv(env.GROQ_MODELS) : DEFAULT_GROQ_MODELS;
+
+  if (groqKey) {
+    for (const model of groqModels) {
+      pushRoute("groq", groqUrl, groqKey, model, 20);
+    }
+  }
+
+  // 2. Official Google Gemini API (AI Studio / Vertex OpenAI-compatible endpoint)
   const geminiKey = (env.GEMINI_API_KEY || env.GOOGLE_API_KEY || "").trim();
   const geminiUrl = (
     env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -96,7 +128,7 @@ export function buildProviderChain(env = process.env) {
     }
   }
 
-  // 2. Private local single-user Gemini gateway (`gemini-api/gateway.py` on 127.0.0.1)
+  // 3. Private local single-user Gemini gateway (`gemini-api/gateway.py` on 127.0.0.1)
   const gatewayToken = (
     env.AGY_GATEWAY_TOKEN ||
     env.GEMINI_GATEWAY_TOKEN ||
@@ -121,7 +153,7 @@ export function buildProviderChain(env = process.env) {
       pushRoute("gemini-gateway", gatewayUrl, gatewayToken, gatewayModel, 10);
     } else {
       console.warn(
-        `[Fathy] Ignoring non-loopback AGY_GATEWAY_URL ("${gatewayUrl}"). Private agy gateway must bind to 127.0.0.1 only; use GEMINI_API_KEY for public/cloud deployments.`,
+        `[Fathy] Ignoring non-loopback AGY_GATEWAY_URL ("${gatewayUrl}"). Private agy gateway must bind to 127.0.0.1 only; use GROQ_API_KEY or GEMINI_API_KEY for public/cloud deployments.`,
       );
     }
   }
