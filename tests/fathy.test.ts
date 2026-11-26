@@ -270,6 +270,16 @@ describe("Fathy AI Full Chat Context & Orchestration", () => {
     expect(cleanAssistantReply("<think>internal thoughts</think> أهلاً بك!")).toBe("أهلاً بك!");
     expect(splitWhatsAppMessage("A".repeat(4000), 1500).length).toBeGreaterThanOrEqual(3);
 
+    const chainWithRequesty = buildProviderChain({
+      REQUESTY_API_KEY: "rqsty-test",
+      UNOROUTER_API_KEY: "sk-test",
+      LOGFARE_API_KEY: "lfu-test",
+    });
+    expect(chainWithRequesty[0]?.provider).toBe("requesty");
+    expect(chainWithRequesty[0]?.model).toBe("google/gemma-4-31b-it");
+    expect(chainWithRequesty[1]?.provider).toBe("requesty");
+    expect(chainWithRequesty[1]?.model).toBe("nvidia/nemotron-3-ultra-550b-a55b");
+
     const chain = buildProviderChain({
       UNOROUTER_API_KEY: "sk-test",
       LOGFARE_API_KEY: "lfu-test",

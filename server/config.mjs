@@ -43,6 +43,14 @@ function splitCsv(raw) {
     .filter(Boolean);
 }
 
+const DEFAULT_REQUESTY_MODELS = [
+  "google/gemma-4-31b-it",
+  "nvidia/nemotron-3-ultra-550b-a55b",
+  "novita/ling-3.1-flash",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+  "nvidia/muse-glimmer-30b",
+];
+
 const DEFAULT_UNOROUTER_MODELS = [
   "gemini-3.6-flash:free",
   "gpt-4o:free",
@@ -76,6 +84,11 @@ const DEFAULT_LOGFARE_MODELS = [
  * responses even during rapid back-to-back WhatsApp conversations.
  */
 export function buildProviderChain(env = process.env) {
+  const requestyKey = (env.REQUESTY_API_KEY || "").trim();
+  const requestyUrl = (env.REQUESTY_BASE_URL || "https://router.requesty.ai/v1")
+    .trim()
+    .replace(/\/+$/, "");
+
   const unorouterKey = (env.UNOROUTER_API_KEY || "").trim();
   const unorouterUrl = (env.UNOROUTER_BASE_URL || "https://api.unorouter.com/v1")
     .trim()
@@ -90,6 +103,11 @@ export function buildProviderChain(env = process.env) {
   const genericUrl = (env.OPENAI_BASE_URL || env.AI_BASE_URL || "")
     .trim()
     .replace(/\/+$/, "");
+
+  const requestyModels =
+    splitCsv(env.REQUESTY_MODELS).length > 0
+      ? splitCsv(env.REQUESTY_MODELS)
+      : DEFAULT_REQUESTY_MODELS;
 
   const unorouterModels =
     splitCsv(env.UNOROUTER_MODELS || env.TOP_10_FREE_MODELS).length > 0
@@ -118,8 +136,14 @@ export function buildProviderChain(env = process.env) {
     chain.push({ provider, baseUrl, apiKey, model, defaultCooldownSec });
   };
 
-  // Interleave UnoRouter (ultra-fast 2-4s non-reasoning models) with Logfare (Premium 40 req/min reasoning models)
-  // Parallel racing in aiClient pairs 1 UnoRouter + 1 Logfare route simultaneously so the fastest responder wins!
+  // TIER 0 (VERY TOP): Requesty free flagship models (google/gemma-4-31b-it + nvidia/nemotron-3-ultra-550b + ...)
+  if (requestyKey) {
+    for (const model of requestyModels) {
+      pushRoute("requesty", requestyUrl, requestyKey, model, 30);
+    }
+  }
+
+  // TIER 1 (Fallbacks): Interleave UnoRouter with Logfare Premium so rate limits seamlessly switch providers
   const maxLen = Math.max(unorouterModels.length, effectiveLogfareModels.length);
   for (let i = 0; i < maxLen; i++) {
     if (unorouterKey && unorouterModels[i]) {

@@ -87,9 +87,10 @@ export class FathyAiClient {
     const controller = new AbortController();
     const onExternalAbort = () => controller.abort();
     externalSignal?.addEventListener("abort", onExternalAbort, { once: true });
-    // Reasoning models on Logfare need more time & token headroom than fast UnoRouter flash models
+    // Reasoning models on Logfare & Gemma-4 on Requesty need enough token headroom so content is never empty
     const isLogfare = route.provider === "logfare";
-    const timeoutMs = isLogfare ? 32000 : 16000;
+    const isRequesty = route.provider === "requesty";
+    const timeoutMs = isLogfare ? 32000 : isRequesty ? 20000 : 16000;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     const startedAt = Date.now();
 
@@ -98,7 +99,7 @@ export class FathyAiClient {
         model: route.model,
         messages: fullMessages,
         temperature: 0.65,
-        max_tokens: isLogfare ? 4096 : 1500,
+        max_tokens: isLogfare ? 4096 : isRequesty ? 2048 : 1500,
       };
       if (isLogfare) {
         requestBody.reasoning_effort = "low";
@@ -128,8 +129,14 @@ export class FathyAiClient {
               ? retryHeader
               : route.defaultCooldownSec,
           );
-        } else if (res.status === 400 || res.status === 404 || res.status === 422) {
-          this.setCooldown(route, 180);
+        } else if (
+          res.status === 400 ||
+          res.status === 402 ||
+          res.status === 404 ||
+          res.status === 410 ||
+          res.status === 422
+        ) {
+          this.setCooldown(route, 300);
         }
         throw new Error(`${route.provider}/${route.model}: HTTP ${res.status} (${errText})`);
       }
