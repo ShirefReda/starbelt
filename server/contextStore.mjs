@@ -64,6 +64,8 @@ export function normalizeMessageRecord(raw, sentMessageIds = null) {
     quotedText: details.quotedText,
     quotedIsFathy: details.quotedIsFathy,
     mediaType: details.mediaType,
+    audioSeconds: details.audioSeconds || 0,
+    audioMimetype: details.audioMimetype || "",
   };
 }
 

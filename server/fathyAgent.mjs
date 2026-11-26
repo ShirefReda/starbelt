@@ -51,13 +51,14 @@ export function splitWhatsAppMessage(text, maxLen = 3500) {
 }
 
 export class FathyAgent {
-  /** @param {{ config: any, evolution: any, contextStore: any, aiClient: any, pdfGenerator?: any }} deps */
-  constructor({ config, evolution, contextStore, aiClient, pdfGenerator = null }) {
+  /** @param {{ config: any, evolution: any, contextStore: any, aiClient: any, pdfGenerator?: any, sttClient?: any }} deps */
+  constructor({ config, evolution, contextStore, aiClient, pdfGenerator = null, sttClient = null }) {
     this.config = config;
     this.evolution = evolution;
     this.contextStore = contextStore;
     this.aiClient = aiClient;
     this.pdfGenerator = pdfGenerator;
+    this.sttClient = sttClient;
     /** Per-chat serialized promise queue so back-to-back messages process in order */
     this.chatQueues = new Map();
     this.stats = {
@@ -67,6 +68,7 @@ export class FathyAgent {
       repliesSent: 0,
       quotationsCreated: 0,
       pdfsSent: 0,
+      voiceNotesTranscribed: 0,
       errors: 0,
       lastEventAt: null,
       lastReplyAt: null,
@@ -160,6 +162,44 @@ export class FathyAgent {
     const normalized = normalizeMessageRecord(rawRecord, this.contextStore.sentMessageIds);
     if (!normalized || !normalized.text) {
       return { skipped: true, reason: "non_text_or_empty" };
+    }
+
+    // Voice-to-Text (Bilingual Egyptian Arabic + English belt specs via ElevenLabs Scribe / Groq Whisper)
+    let voiceTranscript = null;
+    const maxAudioSec = this.config.maxAudioSeconds || 180;
+    if (
+      normalized.mediaType === "audio" &&
+      this.config.transcribeAudio !== false &&
+      this.sttClient &&
+      typeof this.sttClient.isConfigured === "function" &&
+      this.sttClient.isConfigured() &&
+      typeof this.evolution.getMediaBase64 === "function" &&
+      (!normalized.audioSeconds || normalized.audioSeconds <= maxAudioSec)
+    ) {
+      try {
+        const media = await this.evolution.getMediaBase64(rawRecord);
+        if (media?.buffer && media.buffer.length >= 100) {
+          const sttRes = await this.sttClient.transcribeAudio(media.buffer, {
+            mimetype: media.mimetype || normalized.audioMimetype || "audio/ogg",
+          });
+          normalized.text = `[رسالة صوتية]: ${sttRes.text}`;
+          voiceTranscript = {
+            text: sttRes.text,
+            provider: sttRes.provider,
+            model: sttRes.model,
+            latencyMs: sttRes.latencyMs,
+          };
+          this.stats.voiceNotesTranscribed++;
+          console.log(
+            `[Fathy STT] Transcribed voice note in ${normalized.remoteJid} via ${sttRes.provider}/${sttRes.model} in ${sttRes.latencyMs}ms (${sttRes.text.length} chars)`,
+          );
+        }
+      } catch (sttErr) {
+        console.warn(
+          `[Fathy STT] Voice note transcription failed in ${normalized.remoteJid}:`,
+          sttErr instanceof Error ? sttErr.message : sttErr,
+        );
+      }
     }
 
     const { remoteJid, remoteJidAlt, text, fromMe, id, pushName, quotedIsFathy } = normalized;
@@ -448,6 +488,7 @@ export class FathyAgent {
       contextMessages: fullHistory.length,
       ...(createdQuotation ? { createdQuotation } : {}),
       ...(pdfSentInfo ? { pdfSent: pdfSentInfo } : {}),
+      ...(voiceTranscript ? { voiceTranscript } : {}),
     };
   }
 
@@ -523,6 +564,11 @@ export class FathyAgent {
       ownerNumber: this.config.ownerNumber,
       pdf: {
         available: Boolean(this.pdfGenerator?.isAvailable?.()),
+      },
+      stt: {
+        configured: Boolean(this.sttClient?.isConfigured?.()),
+        providers: this.sttClient?.getConfiguredProviders?.() || [],
+        lastSuccess: this.sttClient?.lastSuccess || null,
       },
       evolution: {
         configured: this.evolution.isConfigured(),

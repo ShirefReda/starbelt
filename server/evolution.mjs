@@ -235,6 +235,53 @@ export class EvolutionClient {
   }
 
   /**
+   * Download base64 media (voice notes / audio) from Evolution API v2 via
+   * `POST /chat/getBase64FromMediaMessage/{instance}` (or read inline webhook base64 if present).
+   */
+  async getMediaBase64(rawRecord) {
+    const inlineB64 =
+      rawRecord?.message?.base64 ||
+      rawRecord?.base64 ||
+      rawRecord?.message?.audioMessage?.base64 ||
+      "";
+    const defaultMime =
+      rawRecord?.message?.audioMessage?.mimetype ||
+      rawRecord?.message?.ephemeralMessage?.message?.audioMessage?.mimetype ||
+      "audio/ogg; codecs=opus";
+
+    if (typeof inlineB64 === "string" && inlineB64.trim().length > 100) {
+      const clean = inlineB64.includes(",") ? inlineB64.split(",").pop() : inlineB64;
+      return {
+        buffer: Buffer.from(clean, "base64"),
+        mimetype: defaultMime,
+      };
+    }
+
+    if (!this.isConfigured() || !rawRecord?.key?.id) {
+      return null;
+    }
+
+    const inst = encodeURIComponent(this.instance);
+    const res = await this.request(
+      "POST",
+      `/chat/getBase64FromMediaMessage/${inst}`,
+      {
+        message: rawRecord,
+        convertToMp4: false,
+      },
+      25000,
+    );
+
+    const b64 = typeof res?.base64 === "string" ? res.base64 : "";
+    if (!b64 || b64.length < 100) return null;
+    const clean = b64.includes(",") ? b64.split(",").pop() : b64;
+    return {
+      buffer: Buffer.from(clean, "base64"),
+      mimetype: typeof res?.mimetype === "string" && res.mimetype ? res.mimetype : defaultMime,
+    };
+  }
+
+  /**
    * Inspect current webhook configuration for the instance.
    */
   async findWebhook() {

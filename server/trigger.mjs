@@ -114,6 +114,8 @@ export function extractMessageDetails(rawRecord) {
   const msg = unwrapMessageContainer(rawRecord.message);
   let text = "";
   let mediaType = null;
+  let audioSeconds = 0;
+  let audioMimetype = "";
   let contextInfo = null;
 
   if (msg) {
@@ -141,6 +143,8 @@ export function extractMessageDetails(rawRecord) {
     } else if (msg.audioMessage) {
       mediaType = "audio";
       contextInfo = msg.audioMessage.contextInfo || null;
+      audioSeconds = Number(msg.audioMessage.seconds || 0) || 0;
+      audioMimetype = String(msg.audioMessage.mimetype || "audio/ogg; codecs=opus");
       text = msg.audioMessage.ptt ? "[رسالة صوتية]" : "[ملف صوتي]";
     } else if (msg.stickerMessage) {
       mediaType = "sticker";
@@ -182,5 +186,7 @@ export function extractMessageDetails(rawRecord) {
     quotedText: (quotedText || "").trim(),
     quotedIsFathy,
     mediaType,
+    audioSeconds,
+    audioMimetype,
   };
 }

@@ -19,6 +19,7 @@ import { ChatContextStore } from "./contextStore.mjs";
 import { FathyAiClient } from "./aiClient.mjs";
 import { FathyAgent } from "./fathyAgent.mjs";
 import { escapeJsonForScript, QuotationPdfGenerator } from "./pdfGenerator.mjs";
+import { FathySttClient } from "./sttClient.mjs";
 import {
   buildQuotationFromDraft,
   buildQuotationShareUrl,
@@ -156,12 +157,13 @@ export function createAppServer(customEnv = process.env) {
     supabaseAnonKey: config.supabaseAnonKey,
   });
   const aiClient = new FathyAiClient(config.providers);
+  const sttClient = new FathySttClient(config.stt);
   let activePort = config.port;
   const pdfGenerator = new QuotationPdfGenerator({
     getPort: () => activePort,
     env: customEnv,
   });
-  const fathy = new FathyAgent({ config, evolution, contextStore, aiClient, pdfGenerator });
+  const fathy = new FathyAgent({ config, evolution, contextStore, aiClient, pdfGenerator, sttClient });
 
   const server = http.createServer(async (req, res) => {
     const method = (req.method || "GET").toUpperCase();
@@ -347,6 +349,30 @@ export function createAppServer(customEnv = process.env) {
       return;
     }
 
+    // ---- 4d. Bilingual Voice-to-Text Endpoint (POST /api/fathy/transcribe) ----
+    if (method === "POST" && pathname === "/api/fathy/transcribe") {
+      try {
+        const body = await readJsonBody(req, 25 * 1024 * 1024);
+        const rawB64 = String(body.audioBase64 || body.audio || "").trim();
+        if (!rawB64) {
+          sendJson(res, 400, { ok: false, error: "لم يتم إرسال ملف صوتي." });
+          return;
+        }
+        const cleanB64 = rawB64.includes(",") ? rawB64.split(",").pop() || "" : rawB64;
+        const audioBuffer = Buffer.from(cleanB64, "base64");
+        const mimetype = String(body.mimetype || "audio/webm").trim();
+        const result = await sttClient.transcribeAudio(audioBuffer, { mimetype });
+        fathy.stats.voiceNotesTranscribed++;
+        sendJson(res, 200, { ok: true, ...result });
+      } catch (err) {
+        sendJson(res, 500, {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      return;
+    }
+
     // ---- 5. Evolution API Reverse Proxy for Quotation App (/api/evolution/*) ----
     if (pathname.startsWith("/api/evolution/")) {
       if (!evolution.isConfigured()) {
@@ -430,7 +456,7 @@ export function createAppServer(customEnv = process.env) {
     }
   });
 
-  return { server, config, evolution, contextStore, aiClient, pdfGenerator, fathy };
+  return { server, config, evolution, contextStore, aiClient, pdfGenerator, sttClient, fathy };
 }
 
 // Start server when executed directly

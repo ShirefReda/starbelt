@@ -25,9 +25,30 @@ export interface AppVersion {
   changes: VersionChange[];
 }
 
-export const CURRENT_VERSION = "1.5.1";
+export const CURRENT_VERSION = "1.5.2";
 
 export const APP_VERSIONS: [AppVersion, ...AppVersion[]] = [
+  {
+    version: "1.5.2",
+    date: "26 نوفمبر 2026",
+    title: "دعم الرسائل الصوتية ثنائية اللغة (العامية المصرية + مواصفات السيور بالإنجليزية)",
+    summary:
+      "أصبح فتحي AI يفهم الرسائل الصوتية (فويس نوت) على واتساب والإملاء الصوتي داخل التطبيق بالعامية المصرية المختلطة بمواصفات السيور الإنجليزية عبر ElevenLabs Scribe v3 مع بديل تلقائي عبر Groq Whisper.",
+    changes: [
+      {
+        category: "feat",
+        text: "فهم الرسائل الصوتية على واتساب (ElevenLabs Scribe v3 + معجم ستار بيلت): تكلم بالعامية المصرية واذكر مواصفات السيور بالإنجليزية (مثل PVC 2 ply، PU Food Grade، Timing Belt HTD 8M، PTFE Teflon) وسيفهمها فتحي بدقة وينشئ عرض السعر PDF فوراً.",
+      },
+      {
+        category: "feat",
+        text: "زر الإملاء الصوتي (🎤) داخل نافذة فتحي AI بالتطبيق: سجّل تفاصيل الطلب صوتياً مباشرة لتحويلها إلى نص وتعبئة عرض السعر بنقرة واحدة.",
+      },
+      {
+        category: "improvement",
+        text: "بديل صوتي تلقائي عبر Groq Whisper (whisper-large-v3) بجانب ElevenLabs Scribe v3 لضمان عمل تحويل الصوت لنص بدون توقف.",
+      },
+    ],
+  },
   {
     version: "1.5.1",
     date: "26 نوفمبر 2026",

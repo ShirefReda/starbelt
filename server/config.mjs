@@ -212,6 +212,19 @@ export function getConfig(env = process.env) {
     "sb_publishable_QRmU1-08UfRJaAbmiAXCgw_Xvwmd86K"
   ).trim();
 
+  // Speech-to-Text (ElevenLabs Scribe v3 primary + Groq Whisper automatic fallback)
+  const elevenLabsApiKey = (env.ELEVENLABS_API_KEY || env.XI_API_KEY || "").trim();
+  const elevenLabsBaseUrl = (env.ELEVENLABS_BASE_URL || "https://api.elevenlabs.io")
+    .trim()
+    .replace(/\/+$/, "");
+  const elevenLabsSttModel = (env.ELEVENLABS_STT_MODEL || "scribe_v3").trim();
+  const elevenLabsUseKeyterms =
+    (env.ELEVENLABS_USE_KEYTERMS || "true").toLowerCase() !== "false";
+  const groqApiKey = (env.GROQ_API_KEY || "").trim();
+  const groqBaseUrl = normalizeGroqBaseUrl(env.GROQ_BASE_URL || "https://api.groq.com/openai/v1");
+  const transcribeAudio = (env.FATHY_TRANSCRIBE_AUDIO || "true").toLowerCase() !== "false";
+  const maxAudioSeconds = Number.parseInt(env.FATHY_MAX_AUDIO_SECONDS || "180", 10) || 180;
+
   return {
     port,
     evolutionBaseUrl,
@@ -226,6 +239,16 @@ export function getConfig(env = process.env) {
     maxContextChars,
     supabaseUrl,
     supabaseAnonKey,
+    transcribeAudio,
+    maxAudioSeconds,
+    stt: {
+      elevenLabsApiKey,
+      elevenLabsBaseUrl,
+      elevenLabsModel: elevenLabsSttModel,
+      useKeyterms: elevenLabsUseKeyterms,
+      groqApiKey,
+      groqBaseUrl,
+    },
     providers: buildProviderChain(env),
   };
 }

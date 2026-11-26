@@ -26,6 +26,12 @@ import {
   sanitizeQuotationIntroText,
 } from "../server/quotationTool.mjs";
 import { buildPdfFileName, escapeJsonForScript } from "../server/pdfGenerator.mjs";
+import {
+  FathySttClient,
+  STARBELT_STT_KEYTERMS,
+  extensionForAudioMime,
+  normalizeBilingualBeltTranscript,
+} from "../server/sttClient.mjs";
 
 describe("Fathy AI Trigger & Normalization", () => {
   it("normalizes Arabic variants, diacritics, and repeated letters", () => {
@@ -807,5 +813,183 @@ https://maker.starbelt.com.eg/?quote=SB-2026-9999`;
     } finally {
       globalThis.fetch = origFetch;
     }
+  });
+});
+
+describe("Bilingual Voice-to-Text (Egyptian Arabic + English Belt Specs)", () => {
+  it("validates Star Belt ElevenLabs keyterms glossary constraints and normalizes mixed Arabic/English belt specs", () => {
+    // ElevenLabs constraints: <= 100 terms (no 20s min penalty), <= 50 chars, <= 5 words, no <>[]{}\
+    expect(STARBELT_STT_KEYTERMS.length).toBeGreaterThan(50);
+    expect(STARBELT_STT_KEYTERMS.length).toBeLessThanOrEqual(100);
+    for (const term of STARBELT_STT_KEYTERMS) {
+      expect(term.length).toBeLessThanOrEqual(50);
+      expect(term.trim().split(/\s+/).length).toBeLessThanOrEqual(5);
+      expect(term).not.toMatch(/[<>[\]{}\\]/);
+    }
+
+    expect(extensionForAudioMime("audio/ogg; codecs=opus")).toBe("ogg");
+    expect(extensionForAudioMime("audio/webm;codecs=opus")).toBe("webm");
+
+    const normalized = normalizeBilingualBeltTranscript(
+      "يا فتحي عايزين سير بي في سي أخضر تو بلاي و سير تايمنج بيلت اتش تي دي 8M و سير بي يو فود جريد",
+    );
+    expect(normalized).toContain("PVC");
+    expect(normalized).toContain("2 ply");
+    expect(normalized).toContain("Timing Belt");
+    expect(normalized).toContain("HTD 8M");
+    expect(normalized).toContain("PU");
+    expect(normalized).toContain("Food Grade");
+  });
+
+  it("calls ElevenLabs Scribe v3 with ar+en secondary_language_codes, digits, and keyterms, and falls back to Groq Whisper", async () => {
+    const capturedCalls: Array<{ url: string; headers: Record<string, string>; formFields: Record<string, string[]> }> = [];
+    const origFetch = globalThis.fetch;
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      const form = init?.body as FormData;
+      const fields: Record<string, string[]> = {};
+      if (form && typeof form.forEach === "function") {
+        form.forEach((val, key) => {
+          fields[key] = fields[key] || [];
+          fields[key].push(typeof val === "string" ? val : `[Blob:${val.type}]`);
+        });
+      }
+      capturedCalls.push({
+        url: String(url),
+        headers: (init?.headers || {}) as Record<string, string>,
+        formFields: fields,
+      });
+
+      if (String(url).includes("elevenlabs.io")) {
+        return new Response(
+          JSON.stringify({
+            text: "يا فتحي اعمل عرض سعر 2 سير PVC أخضر 2 ply عرض 50 سم في 12 متر",
+            language_code: "ar",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          text: "عايز سير Timing Belt HTD 8M",
+          language: "arabic",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as unknown as typeof fetch;
+
+    try {
+      const stt = new FathySttClient({
+        elevenLabsApiKey: "xi-test-key",
+        elevenLabsModel: "scribe_v3",
+        useKeyterms: true,
+        groqApiKey: "gsk-test-key",
+      });
+
+      const fakeAudio = Buffer.alloc(512, 0x4f);
+      const res = await stt.transcribeAudio(fakeAudio, { mimetype: "audio/ogg; codecs=opus" });
+      expect(res.provider).toBe("elevenlabs");
+      expect(res.model).toBe("scribe_v3");
+      expect(res.text).toContain("PVC");
+      expect(res.text).toContain("2 ply");
+
+      expect(capturedCalls[0]?.url).toBe("https://api.elevenlabs.io/v1/speech-to-text");
+      expect(capturedCalls[0]?.headers["xi-api-key"]).toBe("xi-test-key");
+      expect(capturedCalls[0]?.formFields.model_id).toEqual(["scribe_v3"]);
+      expect(capturedCalls[0]?.formFields.language_code).toEqual(["ar"]);
+      expect(capturedCalls[0]?.formFields.secondary_language_codes).toEqual(["en"]);
+      expect(capturedCalls[0]?.formFields.numbers_format).toEqual(["digits"]);
+      expect(capturedCalls[0]?.formFields.keyterms?.length).toBe(STARBELT_STT_KEYTERMS.length);
+
+      // Groq-only fallback (when ELEVENLABS_API_KEY is not set)
+      const groqOnly = new FathySttClient({ groqApiKey: "gsk-test-key" });
+      const groqRes = await groqOnly.transcribeAudio(fakeAudio, { mimetype: "audio/ogg" });
+      expect(groqRes.provider).toBe("groq");
+      expect(groqRes.model).toBe("whisper-large-v3");
+      expect(groqRes.text).toContain("Timing Belt HTD 8M");
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it("transcribes an incoming WhatsApp voice note in Egyptian Arabic + English and triggers Fathy automatically", async () => {
+    const jid = "201088888888@s.whatsapp.net";
+    const sentTexts: string[] = [];
+
+    const mockEvolution = {
+      isConfigured: () => true,
+      sendTyping: vi.fn().mockResolvedValue(undefined),
+      fetchChatHistory: vi.fn().mockResolvedValue([]),
+      getMediaBase64: vi.fn().mockResolvedValue({
+        buffer: Buffer.alloc(600, 0x55),
+        mimetype: "audio/ogg; codecs=opus",
+      }),
+      sendText: vi.fn().mockImplementation(async (_to: string, text: string) => {
+        sentTexts.push(text);
+        return { messageId: "VOICE-REPLY-1" };
+      }),
+    };
+
+    const mockStt = {
+      isConfigured: () => true,
+      getConfiguredProviders: () => ["elevenlabs/scribe_v3"],
+      lastSuccess: null,
+      transcribeAudio: vi.fn().mockResolvedValue({
+        text: "يا فتحي عايزين عرض سعر لـ 2 سير PVC أخضر 2 ply عرض 50 سم في 10 متر",
+        provider: "elevenlabs",
+        model: "scribe_v3",
+        languageCode: "ar",
+        latencyMs: 720,
+      }),
+    };
+
+    const capturedPrompts: string[] = [];
+    const mockAiClient = {
+      lastSuccess: null,
+      generateReply: vi.fn().mockImplementation(async (args: { messages: Array<{ content: string }> }) => {
+        capturedPrompts.push(args.messages.map((m) => m.content).join("\n"));
+        return {
+          text: "تمام يا فندم، سمعت رسالتك الصوتية بوضوح!",
+          provider: "groq",
+          model: "qwen/qwen3.8-27b",
+          latencyMs: 420,
+        };
+      }),
+    };
+
+    const agent = new FathyAgent({
+      config: { evolutionInstance: "starbelt", maxHistoryMessages: 50, transcribeAudio: true, maxAudioSeconds: 180, providers: [] },
+      evolution: mockEvolution,
+      contextStore: new ChatContextStore(),
+      aiClient: mockAiClient,
+      sttClient: mockStt,
+    });
+
+    const res = await agent.handleWebhookPayload({
+      event: "messages.upsert",
+      instance: "starbelt",
+      data: {
+        key: { id: "voice-msg-1", remoteJid: jid, fromMe: false },
+        pushName: "م. شريف",
+        messageTimestamp: 1700000900,
+        message: {
+          audioMessage: {
+            ptt: true,
+            seconds: 8,
+            mimetype: "audio/ogg; codecs=opus",
+          },
+        },
+      },
+    });
+
+    const first = res.results?.[0] as { replied?: boolean; voiceTranscript?: { text: string; provider: string } };
+    expect(first?.replied).toBe(true);
+    expect(first?.voiceTranscript?.provider).toBe("elevenlabs");
+    expect(first?.voiceTranscript?.text).toContain("PVC أخضر 2 ply");
+    expect(capturedPrompts[0]).toContain("[رسالة صوتية]:");
+    expect(capturedPrompts[0]).toContain("PVC أخضر 2 ply");
+    expect(agent.stats.voiceNotesTranscribed).toBe(1);
+    expect(sentTexts).toHaveLength(1);
   });
 });
