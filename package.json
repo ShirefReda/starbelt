@@ -1,7 +1,7 @@
 {
   "name": "starbelt-quotations",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.5.1",
   "type": "module",
   "description": "Star Belt - professional Arabic price quotations (بيان سعر) maker + Fathy AI WhatsApp assistant",
   "scripts": {

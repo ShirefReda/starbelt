@@ -19,19 +19,23 @@ import { fetchQuotationById, saveQuotationToSupabase } from "./services/supabase
 type Toast = { id: number; msg: string; error?: boolean };
 
 export function App() {
+  const isHeadlessPrint = Boolean(
+    typeof window !== "undefined" &&
+      (window as unknown as { __FATHY_PRINT_QUOTATION__?: unknown }).__FATHY_PRINT_QUOTATION__,
+  );
   const [state, setState] = useState<AppState>(() => store.get());
   const [zoom, setZoom] = useState(1);
-  const [fitMode, setFitMode] = useState(true);
+  const [fitMode, setFitMode] = useState(!isHeadlessPrint);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showAiDraft, setShowAiDraft] = useState(false);
   const [showWhatsapp, setShowWhatsapp] = useState(false);
-  const [showUpdates, setShowUpdates] = useState(() => shouldShowUpdatesPrompt());
-  const [hasUnseenUpdate, setHasUnseenUpdate] = useState(() => shouldShowUpdatesPrompt());
+  const [showUpdates, setShowUpdates] = useState(() => !isHeadlessPrint && shouldShowUpdatesPrompt());
+  const [hasUnseenUpdate, setHasUnseenUpdate] = useState(() => !isHeadlessPrint && shouldShowUpdatesPrompt());
   const [confirmClear, setConfirmClear] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [showHint, setShowHint] = useState(() => !localStorage.getItem("sb.hintSeen"));
+  const [showHint, setShowHint] = useState(() => !isHeadlessPrint && !localStorage.getItem("sb.hintSeen"));
   const workspaceRef = useRef<HTMLDivElement>(null);
   const toastId = useRef(0);
 
@@ -42,6 +46,7 @@ export function App() {
   const saveTimer = useRef<number | null>(null);
   const cloudSyncTimer = useRef<number | null>(null);
   useEffect(() => {
+    if (isHeadlessPrint) return;
     store.patch({ saveStatus: "dirty" });
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {

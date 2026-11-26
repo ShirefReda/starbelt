@@ -134,6 +134,52 @@ export class EvolutionClient {
   }
 
   /**
+   * Send a PDF/document file on WhatsApp via Evolution API v2 (`POST /message/sendMedia/{instance}`).
+   * Uses the exact same envelope as `src/services/evolution.ts` (raw base64 without data-uri prefix).
+   */
+  async sendDocument(
+    remoteJid,
+    { base64, fileName, caption = "", mimetype = "application/pdf", quotedKey = null },
+  ) {
+    const inst = encodeURIComponent(this.instance);
+    const payload = {
+      number: remoteJid,
+      mediatype: "document",
+      mimetype,
+      media: base64,
+      fileName,
+      caption,
+    };
+    if (quotedKey && quotedKey.id) {
+      payload.quoted = {
+        key: {
+          remoteJid: quotedKey.remoteJid || remoteJid,
+          fromMe: Boolean(quotedKey.fromMe),
+          id: quotedKey.id,
+        },
+      };
+    }
+
+    try {
+      const res = await this.request("POST", `/message/sendMedia/${inst}`, payload, 45000);
+      return {
+        raw: res,
+        messageId: res?.key?.id || res?.id || null,
+      };
+    } catch (err) {
+      if (payload.quoted) {
+        delete payload.quoted;
+        const res = await this.request("POST", `/message/sendMedia/${inst}`, payload, 45000);
+        return {
+          raw: res,
+          messageId: res?.key?.id || res?.id || null,
+        };
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Fetch FULL chat message history for a specific remoteJid from Evolution API v2.
    * Handles all Evolution v2 response shapes ({ messages: { records } }, { records }, or array).
    */

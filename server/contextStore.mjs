@@ -307,7 +307,7 @@ export class ChatContextStore {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
-      const url = `${this.supabaseUrl}/rest/v1/quotations?select=number,client,attention,total,quote_date,items&order=updated_at.desc&limit=15`;
+      const url = `${this.supabaseUrl}/rest/v1/quotations?select=id,number,client,attention,total,quote_date,items&order=updated_at.desc&limit=15`;
       const res = await fetch(url, {
         headers: {
           apikey: this.supabaseAnonKey,
@@ -331,7 +331,7 @@ export class ChatContextStore {
               .filter(Boolean)
               .join("، ")
           : "";
-        return `- عرض رقم ${r.number || "?"} | العميل: ${r.client || "غير محدد"}${r.attention ? ` (عناية: ${r.attention})` : ""} | الإجمالي: ${r.total ?? 0} ج.م | التاريخ: ${r.quote_date || "-"} | أصناف (${itemCount}): ${itemNames}`;
+        return `- [id=${r.id || "?"}] عرض رقم ${r.number || "?"} | العميل: ${r.client || "غير محدد"}${r.attention ? ` (عناية: ${r.attention})` : ""} | الإجمالي: ${r.total ?? 0} ج.م | التاريخ: ${r.quote_date || "-"} | أصناف (${itemCount}): ${itemNames}`;
       });
 
       const summary = lines.join("\n");

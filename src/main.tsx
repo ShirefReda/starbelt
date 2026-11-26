@@ -5,7 +5,10 @@ import "./styles/sheet.css";
 import "./styles/print.css";
 import { App } from "./app";
 
-document.body.classList.add("is-editing");
+const isHeadlessPrintMode = Boolean(
+  (window as unknown as { __FATHY_PRINT_QUOTATION__?: unknown }).__FATHY_PRINT_QUOTATION__,
+);
+document.body.classList.add(isHeadlessPrintMode ? "is-printing" : "is-editing");
 const root = document.getElementById("app");
 if (root) render(<App />, root);
 
@@ -20,8 +23,8 @@ window.addEventListener("vite:preloadError", (event) => {
   }
 });
 
-// Register the service worker for offline use (production only).
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
+// Register the service worker for offline use (production only, skip in headless PDF render mode).
+if (!isHeadlessPrintMode && "serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("./sw.js")

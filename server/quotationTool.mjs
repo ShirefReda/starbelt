@@ -334,6 +334,103 @@ export function extractCreateQuotationCommand(rawText) {
   return { found: true, draft, cleanedText };
 }
 
+/**
+ * Extract `<SEND_QUOTATION_PDF>{...}</SEND_QUOTATION_PDF>` command when the user asks Fathy
+ * to send the PDF of an existing quotation already stored in Supabase.
+ */
+export function extractSendPdfCommand(rawText) {
+  if (!rawText || typeof rawText !== "string") {
+    return { found: false, query: null, cleanedText: "" };
+  }
+
+  const re = /<SEND_QUOTATION_PDF>([\s\S]*?)<\/SEND_QUOTATION_PDF>/i;
+  const match = rawText.match(re);
+  if (!match) {
+    return { found: false, query: null, cleanedText: rawText.trim() };
+  }
+
+  const cleanedText = rawText.replace(re, "").replace(/\n{3,}/g, "\n\n").trim();
+  const query = parseJsonObjectFromAi(match[1]);
+  if (!query) {
+    return {
+      found: true,
+      query: null,
+      cleanedText,
+      parseError: "Failed to parse JSON inside <SEND_QUOTATION_PDF>",
+    };
+  }
+  return { found: true, query, cleanedText };
+}
+
+/**
+ * Fetch an existing Star Belt quotation from Supabase by `id`, `number`, or `client` search.
+ */
+export async function fetchQuotationFromSupabaseServer(
+  query = {},
+  { supabaseUrl = "", supabaseAnonKey = "" } = {},
+) {
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+  const headers = {
+    apikey: supabaseAnonKey,
+    Authorization: `Bearer ${supabaseAnonKey}`,
+    Accept: "application/json",
+  };
+
+  const tryFetch = async (filterQuery) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 7000);
+    try {
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/quotations?select=*&${filterQuery}&order=updated_at.desc&limit=1`,
+        { headers, signal: controller.signal },
+      );
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) return null;
+      const row = rows[0];
+      if (row?.data && typeof row.data === "object") {
+        return row.data;
+      }
+      return buildQuotationFromDraft({
+        id: row.id,
+        number: row.number,
+        date: row.quote_date,
+        client: row.client,
+        attention: row.attention,
+        items: row.items,
+        notes: row.notes,
+        approver: row.approver,
+        thankYou: row.thank_you,
+        ...(row.options && typeof row.options === "object" ? row.options : {}),
+      }).quotation;
+    } catch {
+      clearTimeout(timer);
+      return null;
+    }
+  };
+
+  const id = String(query.id || "").trim();
+  if (id) {
+    const found = await tryFetch(`id=eq.${encodeURIComponent(id)}`);
+    if (found) return found;
+  }
+
+  const number = String(query.number || "").trim();
+  if (number) {
+    const found = await tryFetch(`number=ilike.${encodeURIComponent(`*${number}*`)}`);
+    if (found) return found;
+  }
+
+  const client = String(query.client || "").trim();
+  if (client) {
+    const found = await tryFetch(`client=ilike.${encodeURIComponent(`*${client}*`)}`);
+    if (found) return found;
+  }
+
+  return null;
+}
+
 export function buildQuotationShareUrl(quotationId, publicBaseUrl = "https://maker.starbelt.com.eg") {
   const base = String(publicBaseUrl || "https://maker.starbelt.com.eg").replace(/\/+$/, "");
   return `${base}/?quote=${encodeURIComponent(quotationId)}`;

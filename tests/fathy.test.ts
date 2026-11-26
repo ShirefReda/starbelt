@@ -20,9 +20,11 @@ import {
   buildQuotationShareUrl,
   computeQuotationTotals,
   extractCreateQuotationCommand,
+  extractSendPdfCommand,
   formatQuotationWhatsAppCard,
   parseJsonObjectFromAi,
 } from "../server/quotationTool.mjs";
+import { buildPdfFileName, escapeJsonForScript } from "../server/pdfGenerator.mjs";
 
 describe("Fathy AI Trigger & Normalization", () => {
   it("normalizes Arabic variants, diacritics, and repeated letters", () => {
@@ -641,6 +643,144 @@ describe("SmartCycle Quotation Builder & WhatsApp End-to-End Integration", () =>
         "https://maker.starbelt.com.eg",
       );
       expect(card).toContain("https://maker.starbelt.com.eg/?quote=q_test1234");
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it("renders & sends the official PDF document on WhatsApp when creating or resending a quotation", async () => {
+    const jid = "201077777777@s.whatsapp.net";
+    const sentDocs: Array<{ to: string; fileName: string; mimetype: string; base64: string; caption: string }> = [];
+
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (String(url).includes("/rest/v1/quotations")) {
+        if ((init?.method || "GET").toUpperCase() === "POST") {
+          const body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
+          return new Response(JSON.stringify([body]), {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(
+          JSON.stringify([
+            {
+              id: "q_existing1",
+              number: "SB-2026-9999",
+              client: "شركة النيل",
+              data: {
+                id: "q_existing1",
+                number: "SB-2026-9999",
+                client: "شركة النيل",
+                date: "26/11/2026",
+                items: [{ id: "it_1", name: "سير 50 سم", qty: 2, price: 1500 }],
+                notes: [],
+                approver: "تسنيم",
+                thankYou: "ولكم جزيل الشكر",
+                options: { showVat: false, vatRate: 14, showDiscount: false, discountType: "percent", discountPercent: 0, discountValue: 0, showNumberAndDate: true, showWords: true, showValidity: false, validityDays: 30, showWatermark: true },
+                schemaVersion: 1,
+              },
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return origFetch(url, init);
+    }) as unknown as typeof fetch;
+
+    try {
+      const mockEvolution = {
+        isConfigured: () => true,
+        sendTyping: vi.fn().mockResolvedValue(undefined),
+        fetchChatHistory: vi.fn().mockResolvedValue([]),
+        sendText: vi.fn().mockResolvedValue({ messageId: "TXT-1" }),
+        sendDocument: vi.fn().mockImplementation(async (to: string, payload: { fileName: string; mimetype: string; base64: string; caption: string }) => {
+          sentDocs.push({ to, ...payload });
+          return { messageId: `PDF-${sentDocs.length}` };
+        }),
+      };
+
+      const mockPdfGen = {
+        isAvailable: () => true,
+        renderQuotationToPdf: vi.fn().mockImplementation(async (q: { client: string }) => ({
+          buffer: Buffer.from("%PDF-1.4 mock-starbelt-pdf"),
+          base64: Buffer.from("%PDF-1.4 mock-starbelt-pdf").toString("base64"),
+          fileName: buildPdfFileName(q),
+          byteLength: 42000,
+          durationMs: 1100,
+        })),
+      };
+
+      const mockAiClient = {
+        lastSuccess: null,
+        generateReply: vi
+          .fn()
+          .mockResolvedValueOnce({
+            text: `جهزتلك عرض السعر وبعتلك الـ PDF حالاً:\n<CREATE_QUOTATION>{"client":"مصنع الأمل","items":[{"name":"سير 40 سم","qty":2,"price":2000}],"showVat":false}</CREATE_QUOTATION>`,
+            provider: "groq",
+            model: "qwen/qwen3.8-27b",
+            latencyMs: 600,
+          })
+          .mockResolvedValueOnce({
+            text: `اتفضل ملف PDF عرض سعر شركة النيل:\n<SEND_QUOTATION_PDF>{"id":"q_existing1","client":"شركة النيل"}</SEND_QUOTATION_PDF>`,
+            provider: "groq",
+            model: "qwen/qwen3.8-27b",
+            latencyMs: 500,
+          }),
+      };
+
+      const agent = new FathyAgent({
+        config: {
+          evolutionInstance: "starbelt",
+          maxHistoryMessages: 50,
+          publicBaseUrl: "https://maker.starbelt.com.eg",
+          supabaseUrl: "https://example.supabase.co",
+          supabaseAnonKey: "anon-key",
+          providers: [],
+        },
+        evolution: mockEvolution,
+        contextStore: new ChatContextStore({
+          supabaseUrl: "https://example.supabase.co",
+          supabaseAnonKey: "anon-key",
+        }),
+        aiClient: mockAiClient,
+        pdfGenerator: mockPdfGen,
+      });
+
+      // 1. Create new quotation -> sends real PDF document directly on WhatsApp!
+      const r1 = await agent.handleWebhookPayload({
+        event: "messages.upsert",
+        instance: "starbelt",
+        data: {
+          key: { id: "pdf-req-1", remoteJid: jid, fromMe: false },
+          messageTimestamp: 1700000600,
+          message: { conversation: "يا فتحي اعمل عرض سعر لمصنع الأمل 2 سير 40 سم بـ 2000" },
+        },
+      });
+      expect((r1.results?.[0] as { pdfSent?: { fileName: string } })?.pdfSent?.fileName).toContain("مصنع الأمل");
+      expect(sentDocs).toHaveLength(1);
+      expect(sentDocs[0]?.mimetype).toBe("application/pdf");
+      expect(sentDocs[0]?.caption).toContain("https://maker.starbelt.com.eg/?quote=");
+      expect(sentDocs[0]?.caption).not.toContain("<CREATE_QUOTATION>");
+
+      // 2. Resend existing quotation PDF via <SEND_QUOTATION_PDF>
+      const parsedCmd = extractSendPdfCommand('تمام <SEND_QUOTATION_PDF>{"id":"q_existing1"}</SEND_QUOTATION_PDF>');
+      expect(parsedCmd.found).toBe(true);
+      expect(parsedCmd.query?.id).toBe("q_existing1");
+
+      const r2 = await agent.handleWebhookPayload({
+        event: "messages.upsert",
+        instance: "starbelt",
+        data: {
+          key: { id: "pdf-req-2", remoteJid: jid, fromMe: false },
+          messageTimestamp: 1700000610,
+          message: { conversation: "يا فتحي ابعتلي PDF عرض سعر شركة النيل" },
+        },
+      });
+      expect((r2.results?.[0] as { pdfSent?: { fileName: string } })?.pdfSent?.fileName).toContain("شركة النيل");
+      expect(sentDocs).toHaveLength(2);
+      expect(agent.stats.pdfsSent).toBe(2);
+      expect(escapeJsonForScript({ x: "</script>" })).not.toContain("</script>");
     } finally {
       globalThis.fetch = origFetch;
     }

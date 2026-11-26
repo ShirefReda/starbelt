@@ -5,7 +5,15 @@
  */
 
 import { Store } from "./store";
-import { SCHEMA_VERSION, emptyQuotation, type AppState, type Quotation, type TextAlignment, type TextFontSize } from "./quotation";
+import {
+  SCHEMA_VERSION,
+  emptyQuotation,
+  migrateQuotation,
+  type AppState,
+  type Quotation,
+  type TextAlignment,
+  type TextFontSize,
+} from "./quotation";
 import { mergeCompany } from "../config/companyMerge";
 import { LocalStorageQuotationRepository } from "../storage/localStorageRepository";
 import { uid, localISODate, displayDate } from "../utils/id";
@@ -21,6 +29,14 @@ function initialCompany() {
 }
 
 function initialQuotation(): Quotation {
+  if (typeof window !== "undefined") {
+    const injected = (window as unknown as { __FATHY_PRINT_QUOTATION__?: unknown })
+      .__FATHY_PRINT_QUOTATION__;
+    if (injected) {
+      const migrated = migrateQuotation(injected);
+      if (migrated) return migrated;
+    }
+  }
   const draft = repo.getDraft();
   if (draft) return draft;
   return makeFreshQuotation();

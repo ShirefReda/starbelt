@@ -18,6 +18,7 @@ import { EvolutionClient } from "./evolution.mjs";
 import { ChatContextStore } from "./contextStore.mjs";
 import { FathyAiClient } from "./aiClient.mjs";
 import { FathyAgent } from "./fathyAgent.mjs";
+import { escapeJsonForScript, QuotationPdfGenerator } from "./pdfGenerator.mjs";
 import {
   buildQuotationFromDraft,
   buildQuotationShareUrl,
@@ -155,7 +156,12 @@ export function createAppServer(customEnv = process.env) {
     supabaseAnonKey: config.supabaseAnonKey,
   });
   const aiClient = new FathyAiClient(config.providers);
-  const fathy = new FathyAgent({ config, evolution, contextStore, aiClient });
+  let activePort = config.port;
+  const pdfGenerator = new QuotationPdfGenerator({
+    getPort: () => activePort,
+    env: customEnv,
+  });
+  const fathy = new FathyAgent({ config, evolution, contextStore, aiClient, pdfGenerator });
 
   const server = http.createServer(async (req, res) => {
     const method = (req.method || "GET").toUpperCase();
@@ -315,6 +321,32 @@ export function createAppServer(customEnv = process.env) {
       return;
     }
 
+    // ---- 4c. Direct Server-Side Vector A4 PDF Render (POST /api/fathy/render-pdf) ----
+    if (method === "POST" && pathname === "/api/fathy/render-pdf") {
+      try {
+        const body = await readJsonBody(req);
+        const { quotation } =
+          body.quotation && typeof body.quotation === "object"
+            ? { quotation: body.quotation }
+            : buildQuotationFromDraft(body);
+        const pdf = await pdfGenerator.renderQuotationToPdf(quotation);
+        res.writeHead(200, {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="starbelt-quotation.pdf"; filename*=UTF-8''${encodeURIComponent(pdf.fileName)}`,
+          "Content-Length": String(pdf.byteLength),
+          "Cache-Control": "no-store",
+          "Access-Control-Allow-Origin": "*",
+        });
+        res.end(pdf.buffer);
+      } catch (err) {
+        sendJson(res, 500, {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      return;
+    }
+
     // ---- 5. Evolution API Reverse Proxy for Quotation App (/api/evolution/*) ----
     if (pathname.startsWith("/api/evolution/")) {
       if (!evolution.isConfigured()) {
@@ -339,6 +371,31 @@ export function createAppServer(customEnv = process.env) {
     if (method !== "GET" && method !== "HEAD") {
       sendJson(res, 404, { ok: false, error: "Route not found" });
       return;
+    }
+
+    // Loopback-only headless PDF render token injection (`GET /?renderToken=<token>`)
+    const renderToken = parsedUrl.searchParams.get("renderToken");
+    if (renderToken && (pathname === "/" || pathname === "/index.html")) {
+      const remoteAddr = String(req.socket?.remoteAddress || "");
+      const isLoopback =
+        remoteAddr === "127.0.0.1" ||
+        remoteAddr === "::1" ||
+        remoteAddr === "::ffff:127.0.0.1";
+      const renderQuotation = isLoopback ? pdfGenerator.getRenderToken(renderToken) : null;
+      const indexPath = path.join(DIST_DIR, "index.html");
+      if (renderQuotation && fs.existsSync(indexPath)) {
+        const html = fs.readFileSync(indexPath, "utf8");
+        const injectScript = `<script>window.__FATHY_PRINT_QUOTATION__=${escapeJsonForScript(renderQuotation)};</script>`;
+        const injected = html.includes("</head>")
+          ? html.replace("</head>", `${injectScript}</head>`)
+          : `${injectScript}${html}`;
+        res.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+        });
+        res.end(injected);
+        return;
+      }
     }
 
     const decodedPath = decodeURIComponent(pathname);
@@ -366,7 +423,14 @@ export function createAppServer(customEnv = process.env) {
     res.end("App not built yet. Run npm run build first.");
   });
 
-  return { server, config, evolution, contextStore, aiClient, fathy };
+  server.on("listening", () => {
+    const addr = server.address();
+    if (addr && typeof addr === "object" && addr.port) {
+      activePort = addr.port;
+    }
+  });
+
+  return { server, config, evolution, contextStore, aiClient, pdfGenerator, fathy };
 }
 
 // Start server when executed directly

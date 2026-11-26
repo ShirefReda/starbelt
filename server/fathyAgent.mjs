@@ -19,13 +19,16 @@ import { normalizeMessageRecord } from "./contextStore.mjs";
 import {
   buildQuotationFromDraft,
   buildQuotationShareUrl,
+  computeQuotationTotals,
   extractCreateQuotationCommand,
+  extractSendPdfCommand,
+  fetchQuotationFromSupabaseServer,
   formatQuotationWhatsAppCard,
   saveQuotationToSupabaseServer,
 } from "./quotationTool.mjs";
 
 const QUOTATION_KEYWORDS_RE =
-  /(?:عرض\s*سعر|عروض\s*الاسعار|بيان\s*سعر|سعر|اسعار|تسعير|فاتور|عميل|عملاء|ستار\s*بيلت|ستاربلت|سير|سيور|quotation|quote|price|invoice|starbelt)/i;
+  /(?:عرض\s*سعر|عروض\s*الاسعار|بيان\s*سعر|سعر|اسعار|تسعير|فاتور|عميل|عملاء|ستار\s*بيلت|ستاربلت|سير|سيور|pdf|quotation|quote|price|invoice|starbelt)/i;
 
 /**
  * Split very long WhatsApp messages cleanly at paragraph/line boundaries (WhatsApp stays crisp under ~3500 chars).
@@ -47,11 +50,13 @@ export function splitWhatsAppMessage(text, maxLen = 3500) {
 }
 
 export class FathyAgent {
-  constructor({ config, evolution, contextStore, aiClient }) {
+  /** @param {{ config: any, evolution: any, contextStore: any, aiClient: any, pdfGenerator?: any }} deps */
+  constructor({ config, evolution, contextStore, aiClient, pdfGenerator = null }) {
     this.config = config;
     this.evolution = evolution;
     this.contextStore = contextStore;
     this.aiClient = aiClient;
+    this.pdfGenerator = pdfGenerator;
     /** Per-chat serialized promise queue so back-to-back messages process in order */
     this.chatQueues = new Map();
     this.stats = {
@@ -60,6 +65,7 @@ export class FathyAgent {
       triggersHandled: 0,
       repliesSent: 0,
       quotationsCreated: 0,
+      pdfsSent: 0,
       errors: 0,
       lastEventAt: null,
       lastReplyAt: null,
@@ -259,10 +265,18 @@ export class FathyAgent {
       quotationsSummary,
     });
 
-    // SmartCycle: detect & execute <CREATE_QUOTATION> command if Fathy generated a price offer
+    // SmartCycle: detect & execute <CREATE_QUOTATION> or <SEND_QUOTATION_PDF> commands
     let finalReplyText = aiResult.text;
     let createdQuotation = null;
+    let pdfSentInfo = null;
+    let quotationForPdf = null;
+    let totalsForPdf = null;
+    let savedToCloudForCard = true;
+    let introTextForPdf = "";
+
     const quoteCmd = extractCreateQuotationCommand(aiResult.text);
+    const sendPdfCmd = !quoteCmd.found ? extractSendPdfCommand(aiResult.text) : { found: false, query: null, cleanedText: "" };
+
     if (quoteCmd.found && quoteCmd.draft) {
       const { quotation, totals } = buildQuotationFromDraft(quoteCmd.draft);
       const saveRes = await saveQuotationToSupabaseServer(quotation, {
@@ -272,17 +286,12 @@ export class FathyAgent {
       if (!saveRes.saved) {
         console.warn(`[Fathy SmartCycle] Supabase save failed for ${quotation.id}:`, saveRes.error);
       } else {
-        // Invalidate recent quotations cache so follow-ups immediately see this new offer
         this.contextStore.quotationsCache = { fetchedAt: 0, summary: "" };
       }
 
       const publicBaseUrl = this.config.publicBaseUrl || "https://maker.starbelt.com.eg";
       const shareUrl = buildQuotationShareUrl(quotation.id, publicBaseUrl);
-      const card = formatQuotationWhatsAppCard(quotation, totals, publicBaseUrl, {
-        savedToCloud: saveRes.saved,
-      });
 
-      finalReplyText = [quoteCmd.cleanedText, card].filter(Boolean).join("\n\n");
       this.stats.quotationsCreated++;
       createdQuotation = {
         id: quotation.id,
@@ -292,22 +301,135 @@ export class FathyAgent {
         shareUrl,
         savedToCloud: saveRes.saved,
       };
+      quotationForPdf = quotation;
+      totalsForPdf = totals;
+      savedToCloudForCard = saveRes.saved;
+      introTextForPdf = quoteCmd.cleanedText;
+
+      const card = formatQuotationWhatsAppCard(quotation, totals, publicBaseUrl, {
+        savedToCloud: saveRes.saved,
+      });
+      finalReplyText = [quoteCmd.cleanedText, card].filter(Boolean).join("\n\n");
       console.log(
         `[Fathy SmartCycle] Created quotation ${quotation.number} (${quotation.id}) for "${quotation.client}" total=${totals.total} saved=${saveRes.saved}`,
       );
     } else if (quoteCmd.found && quoteCmd.cleanedText) {
-      // Malformed JSON inside tag — never leak raw tags to WhatsApp
       console.warn(`[Fathy SmartCycle] Ignored malformed <CREATE_QUOTATION>: ${quoteCmd.parseError}`);
       finalReplyText = quoteCmd.cleanedText;
+    } else if (sendPdfCmd.found && sendPdfCmd.query) {
+      const existing = await fetchQuotationFromSupabaseServer(sendPdfCmd.query, {
+        supabaseUrl: this.config.supabaseUrl,
+        supabaseAnonKey: this.config.supabaseAnonKey,
+      });
+      if (existing) {
+        const totals = computeQuotationTotals(existing.items || [], existing.options || {});
+        const publicBaseUrl = this.config.publicBaseUrl || "https://maker.starbelt.com.eg";
+        quotationForPdf = existing;
+        totalsForPdf = totals;
+        savedToCloudForCard = true;
+        introTextForPdf = sendPdfCmd.cleanedText;
+        const card = formatQuotationWhatsAppCard(existing, totals, publicBaseUrl, {
+          savedToCloud: true,
+        });
+        finalReplyText = [sendPdfCmd.cleanedText, card].filter(Boolean).join("\n\n");
+      } else {
+        finalReplyText =
+          [
+            sendPdfCmd.cleanedText,
+            "لم أجد عرض السعر المطلوب في سجل ستار بيلت السحابي. يمكنك إرسال رقم العرض أو اسم العميل بدقة أو طلب إنشاء عرض جديد.",
+          ]
+            .filter(Boolean)
+            .join("\n\n");
+      }
+    } else if (sendPdfCmd.found && sendPdfCmd.cleanedText) {
+      finalReplyText = sendPdfCmd.cleanedText;
     }
 
-    const chunks = splitWhatsAppMessage(finalReplyText, 3500);
-    for (let i = 0; i < chunks.length; i++) {
-      const formatted =
-        i === 0
-          ? this.formatOutgoingReply(chunks[i])
-          : `${chunks[i]}${FATHY_SIGNATURE_MARKER}`;
-      await this.sendAndTrack(remoteJid, replyTarget, formatted, i === 0 ? rawRecord.key : null);
+    // If we have a quotation and headless Chromium PDF rendering is available, send the official Star Belt A4 PDF itself!
+    if (
+      quotationForPdf &&
+      totalsForPdf &&
+      this.pdfGenerator &&
+      typeof this.pdfGenerator.renderQuotationToPdf === "function" &&
+      (!this.pdfGenerator.isAvailable || this.pdfGenerator.isAvailable()) &&
+      typeof this.evolution.sendDocument === "function"
+    ) {
+      try {
+        void this.evolution.sendTyping(replyTarget, 6000);
+        const pdf = await this.pdfGenerator.renderQuotationToPdf(quotationForPdf);
+        const publicBaseUrl = this.config.publicBaseUrl || "https://maker.starbelt.com.eg";
+        const card = formatQuotationWhatsAppCard(quotationForPdf, totalsForPdf, publicBaseUrl, {
+          savedToCloud: savedToCloudForCard,
+        });
+        const fullCaption = this.formatOutgoingReply(
+          [introTextForPdf, card].filter(Boolean).join("\n\n"),
+        );
+        // WhatsApp document captions safely fit ~1000 chars; if longer, put concise summary on PDF + full text after
+        if (fullCaption.length <= 1020) {
+          await this.sendDocumentAndTrack(
+            remoteJid,
+            replyTarget,
+            {
+              base64: pdf.base64,
+              fileName: pdf.fileName,
+              caption: fullCaption,
+              mimetype: "application/pdf",
+            },
+            rawRecord.key,
+          );
+        } else {
+          const shareUrl = buildQuotationShareUrl(quotationForPdf.id, publicBaseUrl);
+          const shortCaption = this.formatOutgoingReply(
+            `📄 *عرض سعر شركة ستار بيلت*\n🏢 العميل: *${quotationForPdf.client}*\n🔢 رقم العرض: ${quotationForPdf.number}\n🔗 للتعديل: ${shareUrl}`,
+          );
+          await this.sendDocumentAndTrack(
+            remoteJid,
+            replyTarget,
+            {
+              base64: pdf.base64,
+              fileName: pdf.fileName,
+              caption: shortCaption,
+              mimetype: "application/pdf",
+            },
+            rawRecord.key,
+          );
+          const chunks = splitWhatsAppMessage(finalReplyText, 3500);
+          for (let i = 0; i < chunks.length; i++) {
+            await this.sendAndTrack(
+              remoteJid,
+              replyTarget,
+              `${chunks[i]}${FATHY_SIGNATURE_MARKER}`,
+              null,
+            );
+          }
+        }
+        this.stats.pdfsSent++;
+        pdfSentInfo = {
+          fileName: pdf.fileName,
+          byteLength: pdf.byteLength,
+          durationMs: pdf.durationMs,
+        };
+        console.log(
+          `[Fathy SmartCycle] Sent official A4 PDF "${pdf.fileName}" (${pdf.byteLength} bytes in ${pdf.durationMs}ms) to ${replyTarget}`,
+        );
+      } catch (pdfErr) {
+        console.warn(
+          `[Fathy SmartCycle] PDF render/send failed, falling back to WhatsApp text card:`,
+          pdfErr instanceof Error ? pdfErr.message : pdfErr,
+        );
+      }
+    }
+
+    // Standard text reply (or fallback if PDF render/send did not happen)
+    if (!pdfSentInfo) {
+      const chunks = splitWhatsAppMessage(finalReplyText, 3500);
+      for (let i = 0; i < chunks.length; i++) {
+        const formatted =
+          i === 0
+            ? this.formatOutgoingReply(chunks[i])
+            : `${chunks[i]}${FATHY_SIGNATURE_MARKER}`;
+        await this.sendAndTrack(remoteJid, replyTarget, formatted, i === 0 ? rawRecord.key : null);
+      }
     }
 
     this.stats.repliesSent++;
@@ -324,6 +446,7 @@ export class FathyAgent {
       latencyMs: aiResult.latencyMs,
       contextMessages: fullHistory.length,
       ...(createdQuotation ? { createdQuotation } : {}),
+      ...(pdfSentInfo ? { pdfSent: pdfSentInfo } : {}),
     };
   }
 
@@ -360,11 +483,45 @@ export class FathyAgent {
     return sent;
   }
 
+  async sendDocumentAndTrack(bufferJid, replyTarget, docPayload, quotedKey) {
+    let sent;
+    try {
+      sent = await this.evolution.sendDocument(replyTarget, { ...docPayload, quotedKey });
+    } catch (err) {
+      if (replyTarget !== bufferJid) {
+        sent = await this.evolution.sendDocument(bufferJid, { ...docPayload, quotedKey });
+      } else {
+        throw err;
+      }
+    }
+    if (sent?.messageId) {
+      this.contextStore.markSentByFathy(sent.messageId);
+    }
+    this.contextStore.recordMessage({
+      id: sent?.messageId || `fathy-pdf:${Date.now()}`,
+      remoteJid: bufferJid,
+      remoteJidAlt: replyTarget !== bufferJid ? replyTarget : "",
+      fromMe: true,
+      isFathy: true,
+      participant: "",
+      pushName: "فتحي",
+      timestamp: Math.floor(Date.now() / 1000),
+      text: `[مستند PDF: ${docPayload.fileName}] ${docPayload.caption || ""}`.trim(),
+      quotedText: "",
+      quotedIsFathy: false,
+      mediaType: "document",
+    });
+    return sent;
+  }
+
   getHealthSummary() {
     return {
       ok: true,
       agent: "Fathy AI (فتحي)",
       ownerNumber: this.config.ownerNumber,
+      pdf: {
+        available: Boolean(this.pdfGenerator?.isAvailable?.()),
+      },
       evolution: {
         configured: this.evolution.isConfigured(),
         baseUrl: this.config.evolutionBaseUrl,
