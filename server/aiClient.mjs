@@ -12,7 +12,7 @@ const FATHY_BASE_SYSTEM_PROMPT = `أنت "فتحي" (Fathy AI) — المساع�
 هويتك وأسلوبك:
 - أنت ذكي جداً، سريع البديهة، عملي، وودود.
 - تتكلم بنفس لغة ولهجة الشخص الذي يكلمك: إذا كلمك بالعربي أو المصري رد عليه بمصري/عربي طبيعي واحترافي وخفيف الظل بدون مبالغة؛ وإذا كلمك بالإنجليزي رد بالإنجليزي.
-- ردودك مناسبة للواتساب: واضحة، مرتبة، مباشرة، ومختصرة بذكاء (استخدم *الخط العريض* والنقاط عند الحاجة)، ولا تكتب مقالات طويلة إلا لو طلب المستخدم تفصيلاً.
+- ردودك مناسبة للواتساب: واضحة، مرتبة، مباشرة، ومختصرة بذكاء (استخدم *الخط العريض* والنقاط عند الحاجة)، ولا تكتب مقالات طويلة إلا لو طلب المستخدم تفصيلاً. أجب دائماً بنص واضح ومفيد ولا تكتفِ بإيموجي فقط.
 - أنت ترى السياق الكامل للمحادثة السابقة في الواتساب (الرسائل السابقة، أسماء المرسلين، والتوقيت، سواء من شريف رضا صاحب الرقم أو من الطرف الآخر أو أعضاء الجروب). استخدم هذا السياق الكامل لفهم القصة كاملة والرد بذكاء ودقة!
 - لو المستخدم طلب منك تلخيص المحادثة، أو الرد على عميل، أو صياغة رسالة، أو حساب أسعار، أو مساعدة تقنية أو عامة — نفّذ المطلوب فوراً اعتماداً على سياق الشات الكامل.
 - لا تضف بادئة مثل "فتحي:" أو "🤖" في بداية ردك لأن النظام يضيفها تلقائياً.
@@ -87,10 +87,10 @@ export class FathyAiClient {
     const controller = new AbortController();
     const onExternalAbort = () => controller.abort();
     externalSignal?.addEventListener("abort", onExternalAbort, { once: true });
-    // Reasoning models on Logfare & Gemma-4 on Requesty need enough token headroom so content is never empty
+    // Reasoning models on Logfare need more time; Requesty & UnoRouter are fast (15s timeout)
     const isLogfare = route.provider === "logfare";
     const isRequesty = route.provider === "requesty";
-    const timeoutMs = isLogfare ? 32000 : isRequesty ? 20000 : 16000;
+    const timeoutMs = isLogfare ? 25000 : isRequesty ? 15000 : 14000;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     const startedAt = Date.now();
 
@@ -123,11 +123,15 @@ export class FathyAiClient {
         const errText = (await res.text()).slice(0, 220);
         if (res.status === 429 || res.status === 503 || res.status === 502) {
           const retryHeader = Number.parseInt(res.headers.get("retry-after") || "", 10);
+          // Concurrency 429 on Requesty recovers quickly (~5s), rate-limit 429 uses header or default
+          const isConcurrencyLimit = /concurrent/i.test(errText);
           this.setCooldown(
             route,
-            Number.isFinite(retryHeader) && retryHeader > 0
-              ? retryHeader
-              : route.defaultCooldownSec,
+            isConcurrencyLimit
+              ? 6
+              : Number.isFinite(retryHeader) && retryHeader > 0
+                ? retryHeader
+                : route.defaultCooldownSec,
           );
         } else if (
           res.status === 400 ||
@@ -146,9 +150,11 @@ export class FathyAiClient {
       const rawContent = choice?.message?.content;
       const cleaned = cleanAssistantReply(rawContent);
 
-      if (!cleaned) {
-        this.setCooldown(route, 30);
-        throw new Error(`${route.provider}/${route.model}: empty content`);
+      // Reject empty or single-emoji-only replies (no letters or digits at all)
+      const hasMeaningfulText = /[a-zA-Z0-9\u0600-\u06FF]/.test(cleaned);
+      if (!cleaned || !hasMeaningfulText) {
+        this.setCooldown(route, 20);
+        throw new Error(`${route.provider}/${route.model}: empty or emoji-only content`);
       }
 
       const latencyMs = Date.now() - startedAt;
@@ -181,13 +187,14 @@ export class FathyAiClient {
   }
 
   /**
-   * Call AI providers in parallel pairs (e.g. 1 Logfare + 1 UnoRouter raced simultaneously)
-   * with automatic cooldown skipping and instant cancellation of the slower sibling.
+   * Call AI providers strictly in priority order (Requesty on top, then UnoRouter & Logfare)
+   * with 1 concurrent request per provider (respects Requesty's free concurrency=1 limit)
+   * and a hard total deadline so a chat queue can never stall.
    */
   async generateReply({ messages, isGroup = false, remoteJid = "", quotationsSummary = "" }) {
     if (!this.providers || this.providers.length === 0) {
       throw new Error(
-        "No AI providers configured. Set UNOROUTER_API_KEY and/or LOGFARE_API_KEY in environment variables.",
+        "No AI providers configured. Set REQUESTY_API_KEY, UNOROUTER_API_KEY, or LOGFARE_API_KEY.",
       );
     }
 
@@ -195,7 +202,7 @@ export class FathyAiClient {
     const fullMessages = [{ role: "system", content: systemPrompt }, ...messages];
 
     const now = Date.now();
-    // Try non-cooled-down routes first; if all are in cooldown, try the ones whose cooldown expires soonest
+    const deadlineAt = now + 50_000;
     const ready = this.providers.filter((r) => !this.isInCooldown(r, now));
     const ordered =
       ready.length > 0
@@ -207,27 +214,20 @@ export class FathyAiClient {
           );
 
     const errors = [];
-    const batchSize = 2;
+    const maxAttempts = Math.min(ordered.length, 8);
 
-    for (let i = 0; i < ordered.length; i += batchSize) {
-      const batch = ordered.slice(i, i + batchSize);
-      const batchAbort = new AbortController();
-
+    for (let i = 0; i < maxAttempts; i++) {
+      if (Date.now() > deadlineAt) {
+        errors.push("overall_deadline_exceeded");
+        break;
+      }
+      const route = ordered[i];
       try {
-        const winner = await Promise.any(
-          batch.map((route) => this.callSingleRoute(route, fullMessages, batchAbort.signal)),
-        );
-        batchAbort.abort();
-        return winner;
-      } catch (aggErr) {
-        batchAbort.abort();
-        if (aggErr && Array.isArray(aggErr.errors)) {
-          for (const e of aggErr.errors) {
-            errors.push(e instanceof Error ? e.message : String(e));
-          }
-        } else {
-          errors.push(aggErr instanceof Error ? aggErr.message : String(aggErr));
-        }
+        return await this.callSingleRoute(route, fullMessages);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[Fathy AI] Fallback from ${route.provider}/${route.model}: ${msg}`);
+        errors.push(msg);
       }
     }
 
