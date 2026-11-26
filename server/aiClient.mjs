@@ -56,7 +56,7 @@ const FATHY_BASE_SYSTEM_PROMPT = `أنت "فتحي" (Fathy AI) — المساع�
 <SEND_QUOTATION_PDF>
 { "id": "معرّف العرض إن وُجد في القائمة", "number": "رقم العرض إن وُجد", "client": "اسم العميل" }
 </SEND_QUOTATION_PDF>
-- ملاحظة هامة: النظام سيحذف الوسم تلقائياً، يولّد ملف الـ PDF الرسمي بنفس شكل تطبيق ستار بيلت، ويرسله مباشرة في الواتساب مع ملخص السعر ورابط التعديل، لذلك لا تكرر الجدول الطويل في رسالتك.`;
+- ملاحظة هامة جداً: النظام سيحذف الوسم تلقائياً، يولّد ملف الـ PDF الرسمي، ويرسل بطاقة الملخص والرابط الحقيقي بنفسه. لذلك **ممنوع تماماً** كتابة أي رقم عرض (مثل SB-...) أو جدول أصناف أو إجمالي أو رابط أو إيموجي 📄 قبل الوسم — اكتب جملة ترحيب واحدة قصيرة جداً (مثلاً: "تم يا فندم، إليك عرض السعر:") ثم الوسم مباشرة!`;
 
 const DRAFT_QUOTATION_SYSTEM_PROMPT = `أنت محلل عروض أسعار ذكي لشركة ستار بيلت لتصنيع السيور (Star Belt).
 مهمتك الوحيدة: تحويل النص الخام الذي يرسله المستخدم (سواء رسالة واتساب من عميل، أو ملاحظة سريعة بالعربي أو المصري أو الإنجليزي) إلى كائن JSON صالح 100% فقط (بدون أي نص إضافي خارج JSON وبدون markdown).
@@ -118,6 +118,49 @@ export function formatMessagesForGatewayPrompt(fullMessages) {
   return parts.join("\n\n---\n\n");
 }
 
+/**
+ * Trim older conversation turns for providers with tight per-request ITPM limits
+ * (e.g., Groq on_demand `qwen/qwen3.8-27b` = 7,000 ITPM, `gpt-oss-120b` = 8,000 TPM).
+ * Preserves the system prompt and the MOST RECENT messages in full so Fathy stays sharp
+ * while avoiding HTTP 413 "Request too large" errors.
+ */
+export function fitMessagesToBudget(fullMessages, maxHistoryChars) {
+  if (!Array.isArray(fullMessages) || fullMessages.length <= 2 || !maxHistoryChars) {
+    return fullMessages;
+  }
+  const hasSystem = fullMessages[0]?.role === "system";
+  const systemMsg = hasSystem ? fullMessages[0] : null;
+  const turns = hasSystem ? fullMessages.slice(1) : fullMessages;
+
+  const kept = [];
+  let usedChars = 0;
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const turn = turns[i];
+    let content = String(turn?.content || "");
+    if (kept.length === 0) {
+      // Always keep the newest turn; if a single coalesced turn is huge, keep its tail (most recent msgs)
+      if (content.length > maxHistoryChars) {
+        content = content.slice(-maxHistoryChars);
+      }
+      kept.push({ role: turn.role, content });
+      usedChars += content.length;
+      continue;
+    }
+    if (usedChars + content.length > maxHistoryChars) {
+      const remaining = maxHistoryChars - usedChars;
+      if (remaining > 400) {
+        kept.push({ role: turn.role, content: content.slice(-remaining) });
+      }
+      break;
+    }
+    kept.push({ role: turn.role, content });
+    usedChars += content.length;
+  }
+
+  kept.reverse();
+  return systemMsg ? [systemMsg, ...kept] : kept;
+}
+
 export class FathyAiClient {
   constructor(providers = []) {
     this.providers = providers;
@@ -166,8 +209,13 @@ export class FathyAiClient {
     ];
 
     if (quotationsSummary) {
+      // Keep quotations summary compact (~1400 chars max) so Groq ITPM budgets stay roomy
+      const compactSummary =
+        quotationsSummary.length > 1400
+          ? `${quotationsSummary.slice(0, 1400)}\n...`
+          : quotationsSummary;
       parts.push(
-        `\nأحدث عروض الأسعار المسجلة في نظام ستار بيلت (Supabase) — استخدمها فقط لو كان السؤال متعلقاً بعرض سعر أو عميل:\n${quotationsSummary}`,
+        `\nأحدث عروض الأسعار المسجلة في نظام ستار بيلت (Supabase) — استخدمها فقط لو كان السؤال متعلقاً بعرض سعر أو عميل:\n${compactSummary}`,
       );
     }
 
@@ -175,19 +223,23 @@ export class FathyAiClient {
   }
 
   /**
-   * Call either official Gemini API (`gemini`) or the private local gateway (`gemini-gateway`).
+   * Call either Groq / official Gemini API or the private local gateway (`gemini-gateway`).
    */
   async callSingleRoute(route, fullMessages, { temperature = 0.55 } = {}) {
     const controller = new AbortController();
     const isGateway = route.provider === "gemini-gateway";
+    const isGroq = route.provider === "groq";
     const timeoutMs = isGateway ? 115_000 : 25_000;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     const startedAt = Date.now();
 
+    // Groq on_demand has 7k-8k ITPM limits; keep history compact (~4500 chars ≈ ~2200 Arabic tokens + system ≈ ~4200 tokens total)
+    const effectiveMessages = isGroq ? fitMessagesToBudget(fullMessages, 4500) : fullMessages;
+
     try {
       let res;
       if (isGateway) {
-        const prompt = formatMessagesForGatewayPrompt(fullMessages);
+        const prompt = formatMessagesForGatewayPrompt(effectiveMessages);
         res = await fetch(`${route.baseUrl}/v1/ask`, {
           method: "POST",
           headers: {
@@ -208,9 +260,9 @@ export class FathyAiClient {
           },
           body: JSON.stringify({
             model: route.model,
-            messages: fullMessages,
+            messages: effectiveMessages,
             temperature,
-            max_tokens: 2048,
+            max_tokens: isGroq ? 1400 : 2048,
           }),
           signal: controller.signal,
         });
@@ -228,6 +280,9 @@ export class FathyAiClient {
               ? retryHeader
               : route.defaultCooldownSec,
           );
+        } else if (res.status === 413) {
+          // Do not put route in long cooldown on 413 payload size; brief 5s pause only
+          this.setCooldown(route, 5);
         } else if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 404) {
           this.setCooldown(route, 120);
         }

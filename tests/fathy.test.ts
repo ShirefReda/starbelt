@@ -8,7 +8,7 @@ import {
   normalizeForTrigger,
 } from "../server/trigger.mjs";
 import { ChatContextStore, normalizeMessageRecord } from "../server/contextStore.mjs";
-import { FathyAiClient, cleanAssistantReply } from "../server/aiClient.mjs";
+import { FathyAiClient, cleanAssistantReply, fitMessagesToBudget } from "../server/aiClient.mjs";
 import { FathyAgent, splitWhatsAppMessage } from "../server/fathyAgent.mjs";
 import {
   buildProviderChain,
@@ -23,6 +23,7 @@ import {
   extractSendPdfCommand,
   formatQuotationWhatsAppCard,
   parseJsonObjectFromAi,
+  sanitizeQuotationIntroText,
 } from "../server/quotationTool.mjs";
 import { buildPdfFileName, escapeJsonForScript } from "../server/pdfGenerator.mjs";
 
@@ -781,6 +782,28 @@ describe("SmartCycle Quotation Builder & WhatsApp End-to-End Integration", () =>
       expect(sentDocs).toHaveLength(2);
       expect(agent.stats.pdfsSent).toBe(2);
       expect(escapeJsonForScript({ x: "</script>" })).not.toContain("</script>");
+
+      // Sanitizer strips hallucinated duplicate cards/fake SB numbers before the real server card
+      const hallucinated = `تم إنشاء عرض السعر لعميل شركة الاختبار.
+📄 تم تجهيز عرض السعر بنجاح!
+🔢 رقم العرض: SB-2026-9999
+https://maker.starbelt.com.eg/?quote=SB-2026-9999`;
+      expect(sanitizeQuotationIntroText(hallucinated)).toBe("تم إنشاء عرض السعر لعميل شركة الاختبار.");
+
+      // Groq ITPM budget trimmer preserves system prompt + newest turns within budget
+      const bigHistory = [
+        { role: "system", content: "SYSTEM" },
+        { role: "user", content: "OLD_MSG ".repeat(800) },
+        { role: "assistant", content: "OLD_REPLY ".repeat(400) },
+        { role: "user", content: "LATEST_USER_REQUEST" },
+      ];
+      const trimmed = fitMessagesToBudget(bigHistory, 4500);
+      expect(trimmed[0]?.role).toBe("system");
+      expect(trimmed[trimmed.length - 1]?.content).toBe("LATEST_USER_REQUEST");
+      const historyChars = trimmed
+        .slice(1)
+        .reduce((s: number, m: { content: string }) => s + m.content.length, 0);
+      expect(historyChars).toBeLessThanOrEqual(4500);
     } finally {
       globalThis.fetch = origFetch;
     }

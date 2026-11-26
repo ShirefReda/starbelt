@@ -24,6 +24,7 @@ import {
   extractSendPdfCommand,
   fetchQuotationFromSupabaseServer,
   formatQuotationWhatsAppCard,
+  sanitizeQuotationIntroText,
   saveQuotationToSupabaseServer,
 } from "./quotationTool.mjs";
 
@@ -304,12 +305,12 @@ export class FathyAgent {
       quotationForPdf = quotation;
       totalsForPdf = totals;
       savedToCloudForCard = saveRes.saved;
-      introTextForPdf = quoteCmd.cleanedText;
+      introTextForPdf = sanitizeQuotationIntroText(quoteCmd.cleanedText);
 
       const card = formatQuotationWhatsAppCard(quotation, totals, publicBaseUrl, {
         savedToCloud: saveRes.saved,
       });
-      finalReplyText = [quoteCmd.cleanedText, card].filter(Boolean).join("\n\n");
+      finalReplyText = [introTextForPdf, card].filter(Boolean).join("\n\n");
       console.log(
         `[Fathy SmartCycle] Created quotation ${quotation.number} (${quotation.id}) for "${quotation.client}" total=${totals.total} saved=${saveRes.saved}`,
       );
@@ -327,11 +328,11 @@ export class FathyAgent {
         quotationForPdf = existing;
         totalsForPdf = totals;
         savedToCloudForCard = true;
-        introTextForPdf = sendPdfCmd.cleanedText;
+        introTextForPdf = sanitizeQuotationIntroText(sendPdfCmd.cleanedText);
         const card = formatQuotationWhatsAppCard(existing, totals, publicBaseUrl, {
           savedToCloud: true,
         });
-        finalReplyText = [sendPdfCmd.cleanedText, card].filter(Boolean).join("\n\n");
+        finalReplyText = [introTextForPdf, card].filter(Boolean).join("\n\n");
       } else {
         finalReplyText =
           [
@@ -506,7 +507,8 @@ export class FathyAgent {
       participant: "",
       pushName: "فتحي",
       timestamp: Math.floor(Date.now() / 1000),
-      text: `[مستند PDF: ${docPayload.fileName}] ${docPayload.caption || ""}`.trim(),
+      // Store compact 1-line summary in context buffer (saves Groq tokens & prevents LLM mimicking old cards)
+      text: `[أرسل فتحي ملف PDF: ${docPayload.fileName}]`,
       quotedText: "",
       quotedIsFathy: false,
       mediaType: "document",

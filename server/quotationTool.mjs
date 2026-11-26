@@ -335,6 +335,39 @@ export function extractCreateQuotationCommand(rawText) {
 }
 
 /**
+ * Sanitize optional LLM intro text before a server-rendered quotation card so a model
+ * can NEVER duplicate or hallucinate a fake offer number/summary/link above the real card.
+ */
+export function sanitizeQuotationIntroText(rawIntro) {
+  if (!rawIntro || typeof rawIntro !== "string") return "";
+  // Cut off immediately if the model started writing its own card/summary/link
+  const lines = rawIntro
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const safeLines = [];
+  for (const line of lines) {
+    if (
+      /(?:📄|🔢|🏢|👤|📅|💰|🔗|☁️)/.test(line) ||
+      /https?:\/\//i.test(line) ||
+      /\bSB-\d{4}-/i.test(line) ||
+      /(?:رقم\s*العرض|تم\s*تجهيز\s*عرض|الإجمالي\s*النهائي|الأصناف\s*:|افتح\s*العرض|محفوظ\s*تلقائياً)/i.test(
+        line,
+      )
+    ) {
+      break;
+    }
+    safeLines.push(line);
+    if (safeLines.length >= 1) break; // Keep at most 1 brief intro line
+  }
+
+  const intro = safeLines.join(" ").trim();
+  if (!intro || intro.length > 140) return "";
+  return intro;
+}
+
+/**
  * Extract `<SEND_QUOTATION_PDF>{...}</SEND_QUOTATION_PDF>` command when the user asks Fathy
  * to send the PDF of an existing quotation already stored in Supabase.
  */
