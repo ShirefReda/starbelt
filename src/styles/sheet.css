@@ -125,7 +125,8 @@
   z-index: 3;
   display: flex;
   flex-direction: column;
-  padding: 4mm 10mm 0;
+  padding: 4mm 10mm 4mm;
+  overflow: hidden;
 }
 
 .doc-title {
@@ -1012,10 +1013,10 @@ body.is-exporting .approval-line__input {
 .tail-block {
   break-inside: avoid;
   page-break-inside: avoid;
-  margin-top: 5mm;
+  margin-top: 4mm;
   display: flex;
   flex-direction: column;
-  gap: 4mm;
+  gap: 3mm;
 }
 
 .notes-block {
@@ -1087,9 +1088,9 @@ body.is-exporting .approval-line__input {
 }
 
 .thanks-wrap {
-  padding: 5mm 0 4mm;
-  margin: 4mm 0 2mm;
-  min-height: 16mm;
+  padding: 2mm 0;
+  margin: 2mm 0 1mm;
+  min-height: 12mm;
   display: flex;
   align-items: center;
   justify-content: center;

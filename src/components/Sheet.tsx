@@ -87,15 +87,16 @@ export function Sheet({ state, zoom }: SheetProps) {
 
     const measure = () => {
       const rows = Array.from(root.querySelectorAll<HTMLElement>("[data-measure-row]"));
-      const titleH = heightOf(root, "[data-measure-title]");
-      const clientH = heightOf(root, "[data-measure-client]");
+      const titleH = outerHeightOf(root, "[data-measure-title]");
+      const metaH = options.showNumberAndDate ? outerHeightOf(root, "[data-measure-meta]") : 0;
+      const clientH = outerHeightOf(root, "[data-measure-client]");
+      const contMetaH = outerHeightOf(root, "[data-measure-cont-meta]");
       const headH = heightOf(root, "[data-measure-head]");
-      const tailH = heightOf(root, "[data-measure-tail]");
-      const metaH = options.showNumberAndDate ? 26 : 0;
-      const rowHeights = rows.map((r) => r.getBoundingClientRect().height);
+      const tailH = outerHeightOf(root, "[data-measure-tail]");
+      const rowHeights = rows.map((r) => Math.ceil(r.getBoundingClientRect().height));
 
       const firstPageRowCapacity = Math.max(40, CONTENT_H - titleH - metaH - clientH - headH);
-      const otherPageRowCapacity = Math.max(40, CONTENT_H - headH);
+      const otherPageRowCapacity = Math.max(40, CONTENT_H - contMetaH - headH);
 
       const result = paginateRows({
         rowHeights,
@@ -139,10 +140,27 @@ export function Sheet({ state, zoom }: SheetProps) {
     <>
       {/* Off-screen measuring copy — real content, never shown or printed. */}
       <div class="sheet-measure" ref={measureRef} aria-hidden="true">
-        <div data-measure-title style={{ width: `${CONTENT_W}px` }}>
+        <div data-measure-title style={{ width: `${CONTENT_W}px`, display: "flow-root" }}>
           <div class="doc-title">بيان سعر</div>
         </div>
-        <div data-measure-client style={{ width: `${CONTENT_W}px` }}>
+        <div data-measure-meta style={{ width: `${CONTENT_W}px`, display: "flow-root" }}>
+          <div class="doc-meta">
+            <span>
+              {S.options.quotationNumber}: {quotation.number}
+            </span>
+          </div>
+        </div>
+        <div data-measure-cont-meta style={{ width: `${CONTENT_W}px`, display: "flow-root" }}>
+          <div class="doc-meta page-cont-meta">
+            <span>
+              {S.sheet.clientPrefix}
+              {quotation.client || S.sheet.clientPlaceholder}
+              {quotation.attention ? ` — ${S.sheet.attentionPrefix}${quotation.attention}` : ""}
+            </span>
+            <span>{t(S.sheet.pageXofY, { x: 2, y: 2 })}</span>
+          </div>
+        </div>
+        <div data-measure-client style={{ width: `${CONTENT_W}px`, display: "flow-root" }}>
           <div class="client-date-row">
             <div class="client-lines">
               <div class="client-line">
@@ -163,20 +181,27 @@ export function Sheet({ state, zoom }: SheetProps) {
           </div>
         </div>
         <table class="table-wrap" style={{ width: `${CONTENT_W}px` }}>
+          <colgroup>
+            <col class="col-num" />
+            <col class="col-item" />
+            <col class="col-qty" />
+            <col class="col-price" />
+            <col class="col-total" />
+          </colgroup>
           <thead>
             <tr data-measure-head>
-              <th class="col-num">{S.sheet.colIndex}</th>
-              <th class="col-item">{S.sheet.colItem}</th>
-              <th class="col-qty">{S.sheet.colQty}</th>
-              <th class="col-price">{S.sheet.colPrice}</th>
-              <th class="col-total">{S.sheet.colTotal}</th>
+              <th>{S.sheet.colIndex}</th>
+              <th>{S.sheet.colItem}</th>
+              <th>{S.sheet.colQty}</th>
+              <th>{S.sheet.colPrice}</th>
+              <th>{S.sheet.colTotal}</th>
             </tr>
           </thead>
           <tbody>
             {quotation.items.map((item, i) => (
               <tr key={item.id} data-measure-row={i}>
                 <td class="cell-num">{i + 1}</td>
-                <td class="cell-item">
+                <td class="cell-item" data-align={item.align || "right"} data-size={item.fontSize || "md"}>
                   <FormattedItemText item={item} measuring />
                 </td>
                 <td class="cell-qty">{formatInt(item.qty)}</td>
@@ -186,7 +211,7 @@ export function Sheet({ state, zoom }: SheetProps) {
             ))}
           </tbody>
         </table>
-        <div data-measure-tail style={{ width: `${CONTENT_W}px` }}>
+        <div data-measure-tail style={{ width: `${CONTENT_W}px`, display: "flow-root" }}>
           <TailBlock quotation={quotation} totals={totals} measuring />
         </div>
       </div>
@@ -217,6 +242,17 @@ export function Sheet({ state, zoom }: SheetProps) {
 
 function heightOf(root: HTMLElement, selector: string): number {
   return root.querySelector<HTMLElement>(selector)?.getBoundingClientRect().height ?? 0;
+}
+
+/** Measure full height of a flow-root wrapper (capturing inner child vertical margins). */
+function outerHeightOf(root: HTMLElement, selector: string): number {
+  const el = root.querySelector<HTMLElement>(selector);
+  if (!el) return 0;
+  const rect = el.getBoundingClientRect();
+  const cs = typeof window !== "undefined" ? window.getComputedStyle(el) : null;
+  const mt = cs ? Number.parseFloat(cs.marginTop) || 0 : 0;
+  const mb = cs ? Number.parseFloat(cs.marginBottom) || 0 : 0;
+  return Math.ceil(rect.height + mt + mb);
 }
 
 function buildPages(quotation: Quotation, breaks: number[]): BuiltPage[] {
@@ -313,9 +349,6 @@ function SheetPage({
               <div class="doc-meta">
                 <span>
                   {S.options.quotationNumber}: {quotation.number}
-                </span>
-                <span>
-                  {S.options.date}: {currentDate}
                 </span>
               </div>
             )}

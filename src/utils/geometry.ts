@@ -13,10 +13,13 @@ export const PAGE_H_MM = 297;
 export const HEADER_BAND_MM = 33;
 export const FOOTER_BAND_MM = 26;
 export const BODY_PAD_TOP_MM = 4;
+export const BODY_PAD_BOTTOM_MM = 6;
 export const BODY_PAD_X_MM = 10;
 
 /** Width of the printable content column, in px. */
 export const CONTENT_W = MM(PAGE_W_MM - 2 * BODY_PAD_X_MM);
 
-/** Usable body height, in px (page minus bands minus top padding minus a safety margin). */
-export const CONTENT_H = MM(PAGE_H_MM - HEADER_BAND_MM - FOOTER_BAND_MM - BODY_PAD_TOP_MM - 2);
+/** Usable body height, in px (page minus header/footer bands and top/bottom safety margins). */
+export const CONTENT_H = MM(
+  PAGE_H_MM - HEADER_BAND_MM - FOOTER_BAND_MM - BODY_PAD_TOP_MM - BODY_PAD_BOTTOM_MM,
+);
