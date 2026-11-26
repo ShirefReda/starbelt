@@ -1,11 +1,14 @@
 /**
- * Multi-provider OpenAI-compatible AI engine for Fathy AI.
+ * Gemini-Only AI Engine for Fathy AI + Star Belt SmartCycle.
  *
- * Features:
- * - Interleaved fallback across UnoRouter (Top 10 smartest free models) + Logfare (Premium 40 req/min)
- * - Automatic per-model cooldown tracking on HTTP 429 / 503 (never wastes time retrying rate-limited routes)
- * - Clean extraction of final text (strips reasoning tags if leaked into content)
+ * Supports:
+ * 1. Official Google Gemini API (`provider: "gemini"`, via `GEMINI_API_KEY`) —
+ *    recommended for Coolify / multi-user WhatsApp & web quotation drafts.
+ * 2. Private local single-user `gemini-api/gateway.py` (`provider: "gemini-gateway"`,
+ *    strictly `127.0.0.1` loopback-only via `AGY_GATEWAY_URL` + `AGY_GATEWAY_TOKEN`).
  */
+
+import { parseJsonObjectFromAi } from "./quotationTool.mjs";
 
 const FATHY_BASE_SYSTEM_PROMPT = `أنت "فتحي" (Fathy AI) — المساعد الذكي المدمج مباشرة داخل رقم واتساب شريف رضا (01208840531) التابع لشركة ستار بيلت لتصنيع السيور (Star Belt).
 
@@ -23,7 +26,63 @@ const FATHY_BASE_SYSTEM_PROMPT = `أنت "فتحي" (Fathy AI) — المساع�
 - البريد الإلكتروني: starbelt86@gmail.com
 - أرقام التواصل: 01011074556 / 01227156258 / 01208840531 (شريف رضا - الإدارة).
 - تطبيق عروض الأسعار: https://maker.starbelt.com.eg
-- لو طلب أحد إيقافك في المحادثة، يمكنك تذكيره أنه يستطيع قول "خلاص يا فتحي" أو "stop fathy".`;
+- لو طلب أحد إيقافك في المحادثة، يمكنك تذكيره أنه يستطيع قول "خلاص يا فتحي" أو "stop fathy".
+
+إنشاء عروض الأسعار التلقائي (SmartCycle — الربط المباشر مع تطبيق عروض أسعار ستار بيلت):
+- لديك قدرة حقيقية ومباشرة على إنشاء عرض سعر (بيان سعر) وحفظه فوراً في قاعدة بيانات ستار بيلت (Supabase) وإرسال رابط فتحه مباشرة داخل تطبيق الويب https://maker.starbelt.com.eg للتعديل أو تحميل PDF وإرساله للعميل.
+- متى تستخدم هذه الأداة؟ فقط عندما يطلب المستخدم صراحة إنشاء أو تجهيز أو عمل عرض سعر / بيان سعر / مسودة تسعير (مثل: "اعمل عرض سعر"، "جهز بيان سعر للعميل ده"، "سعرلي الأصناف دي في عرض سعر"، "create quotation / price offer").
+- استخرج بيانات العرض بدقة من سياق المحادثة الكامل (اسم العميل/الشركة، عناية المهندس/الأستاذ إن وجد، قائمة الأصناف بالمقاسات والمواصفات بدقة، الكميات، سعر الوحدة بالجنيه، هل شامل ضريبة 14% أم لا، هل يوجد خصم بنسبة أو مبلغ ثابت، والملاحظات).
+- لو الأسعار غير مذكورة في الشات ولم يطلب المستخدم عمل مسودة بدون أسعار، يمكنك أولاً سؤاله عن الأسعار، أما لو كانت الأسعار مذكورة أو طلب عمل مسودة فورية (أو لو كان هناك أصناف واضحة وطلب تجهيز العرض فوراً)، أنشئ العرض مباشرة (وضع السعر 0 لأي صنف بدون سعر ليعدّله في التطبيق).
+- عند إنشاء العرض، اكتب جملة ترحيب/تأكيد قصيرة (سطر واحد)، ثم أضف في نهاية ردك هذا الوسم بدقة وبصيغة JSON صالحة تماماً بدون أي تعليقات داخل الـ JSON:
+<CREATE_QUOTATION>
+{
+  "client": "اسم العميل أو الشركة",
+  "attention": "اسم الشخص المعني (اختياري أو فارغ)",
+  "items": [
+    { "name": "وصف الصنف والمقاس بالكامل", "qty": 2, "price": 1500 }
+  ],
+  "showVat": false,
+  "vatRate": 14,
+  "showDiscount": false,
+  "discountType": "percent",
+  "discountPercent": 0,
+  "discountValue": 0,
+  "showValidity": false,
+  "validityDays": 30,
+  "notes": ["السعر: غير شامل الضريبة."]
+}
+</CREATE_QUOTATION>
+- ملاحظة هامة: النظام سيقوم تلقائياً بحذف وسم <CREATE_QUOTATION> وحفظ العرض في Supabase واستبداله ببطاقة واتساب منسقة تحتوي على الإجمالي ورابط فتح العرض المباشر، لذلك لا تكرر الجدول الطويل قبل الوسم.`;
+
+const DRAFT_QUOTATION_SYSTEM_PROMPT = `أنت محلل عروض أسعار ذكي لشركة ستار بيلت لتصنيع السيور (Star Belt).
+مهمتك الوحيدة: تحويل النص الخام الذي يرسله المستخدم (سواء رسالة واتساب من عميل، أو ملاحظة سريعة بالعربي أو المصري أو الإنجليزي) إلى كائن JSON صالح 100% فقط (بدون أي نص إضافي خارج JSON وبدون markdown).
+
+قواعد الاستخراج:
+1. استخرج "client" (اسم الشركة أو العميل). لو غير مذكور اكتب "عميل ستار بيلت".
+2. استخرج "attention" (عناية المهندس/الأستاذ/المسؤول) إن وجد، وإلا "".
+3. استخرج مصفوفة "items": كل عنصر يحتوي على:
+   - "name": وصف واضح ومرتب للصنف شاملاً المقاسات والمواصفات (مثلاً: "سير ناقل PVC أخضر 2 تيلة مقاس 50 سم × 20 متر").
+   - "qty": رقم الكمية (الافتراضي 1).
+   - "price": رقم سعر الوحدة بالجنيه المصري (الافتراضي 0 إذا لم يُذكر السعر).
+4. إذا ذُكر "شامل الضريبة" أو "+14%" أو "VAT" اجعل "showVat": true و "vatRate": 14. وإلا اجعل "showVat": false.
+5. إذا ذُكر خصم (نسبة مئوية أو مبلغ ثابت)، اضبط "showDiscount": true و "discountType" ("percent" أو "fixed") و "discountPercent" أو "discountValue".
+6. أضف أي شروط توريد أو ملاحظات مهمة في مصفوفة "notes" (مثلاً مدة التوريد أو الضريبة).
+
+أرجع JSON فقط بهذا الشكل بالضبط:
+{
+  "client": "",
+  "attention": "",
+  "items": [{ "name": "", "qty": 1, "price": 0 }],
+  "showVat": false,
+  "vatRate": 14,
+  "showDiscount": false,
+  "discountType": "percent",
+  "discountPercent": 0,
+  "discountValue": 0,
+  "showValidity": false,
+  "validityDays": 30,
+  "notes": []
+}`;
 
 /**
  * Strip leaked chain-of-thought tags (e.g. <think>...</think>) and tidy whitespace.
@@ -34,6 +93,25 @@ export function cleanAssistantReply(raw) {
     .replace(/<think>[\s\S]*?<\/think>/gi, "")
     .replace(/^\s*🤖?\s*\*?فتحي(?:\s*AI)?\s*:?\*?\s*/i, "")
     .trim();
+}
+
+/**
+ * Flatten an OpenAI-style messages array into a single clear prompt for `POST /v1/ask`
+ * on the local private `gemini-api/gateway.py` server.
+ */
+export function formatMessagesForGatewayPrompt(fullMessages) {
+  const parts = [];
+  for (const msg of fullMessages) {
+    if (!msg || !msg.content) continue;
+    if (msg.role === "system") {
+      parts.push(`[تعليمات النظام]\n${msg.content}`);
+    } else if (msg.role === "assistant") {
+      parts.push(`[رد فتحي السابق]\n${msg.content}`);
+    } else {
+      parts.push(`[المحادثة / الطلب]\n${msg.content}`);
+    }
+  }
+  return parts.join("\n\n---\n\n");
 }
 
 export class FathyAiClient {
@@ -54,8 +132,20 @@ export class FathyAiClient {
   }
 
   setCooldown(route, seconds) {
-    const sec = Math.max(5, Math.min(300, Number(seconds) || route.defaultCooldownSec || 30));
+    const sec = Math.max(5, Math.min(300, Number(seconds) || route.defaultCooldownSec || 20));
     this.cooldowns.set(this.getRouteKey(route), Date.now() + sec * 1000);
+  }
+
+  /**
+   * True when the ONLY configured backend is the private single-user `gemini-gateway`
+   * (used by FathyAgent to enforce owner-only WhatsApp access per `agy-server-brief.md` Hard Rule #3).
+   */
+  isPrivateGatewayOnly() {
+    return (
+      Array.isArray(this.providers) &&
+      this.providers.length > 0 &&
+      this.providers.every((p) => p.provider === "gemini-gateway")
+    );
   }
 
   buildSystemPrompt({ isGroup, remoteJid, quotationsSummary }) {
@@ -81,80 +171,73 @@ export class FathyAiClient {
   }
 
   /**
-   * Call a single provider route with timeout + automatic cooldown handling.
+   * Call either official Gemini API (`gemini`) or the private local gateway (`gemini-gateway`).
    */
-  async callSingleRoute(route, fullMessages, externalSignal) {
+  async callSingleRoute(route, fullMessages, { temperature = 0.55 } = {}) {
     const controller = new AbortController();
-    const onExternalAbort = () => controller.abort();
-    externalSignal?.addEventListener("abort", onExternalAbort, { once: true });
-    // Reasoning models on Logfare need more time; Requesty & UnoRouter are fast (15s timeout)
-    const isLogfare = route.provider === "logfare";
-    const isRequesty = route.provider === "requesty";
-    const timeoutMs = isLogfare ? 25000 : isRequesty ? 15000 : 14000;
+    const isGateway = route.provider === "gemini-gateway";
+    const timeoutMs = isGateway ? 115_000 : 25_000;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     const startedAt = Date.now();
 
     try {
-      const requestBody = {
-        model: route.model,
-        messages: fullMessages,
-        temperature: 0.65,
-        max_tokens: isLogfare ? 4096 : isRequesty ? 2048 : 1500,
-      };
-      if (isLogfare) {
-        requestBody.reasoning_effort = "low";
+      let res;
+      if (isGateway) {
+        const prompt = formatMessagesForGatewayPrompt(fullMessages);
+        res = await fetch(`${route.baseUrl}/v1/ask`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${route.apiKey}`,
+          },
+          body: JSON.stringify({ prompt, model: route.model }),
+          signal: controller.signal,
+        });
+      } else {
+        res = await fetch(`${route.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${route.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: route.model,
+            messages: fullMessages,
+            temperature,
+            max_tokens: 2048,
+          }),
+          signal: controller.signal,
+        });
       }
-
-      const res = await fetch(`${route.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${route.apiKey}`,
-          "User-Agent": "Mozilla/5.0",
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      });
 
       clearTimeout(timeout);
 
       if (!res.ok) {
-        const errText = (await res.text()).slice(0, 220);
-        if (res.status === 429 || res.status === 503 || res.status === 502) {
+        const errText = (await res.text()).slice(0, 240);
+        if (res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504) {
           const retryHeader = Number.parseInt(res.headers.get("retry-after") || "", 10);
-          // Concurrency 429 on Requesty recovers quickly (~5s), rate-limit 429 uses header or default
-          const isConcurrencyLimit = /concurrent/i.test(errText);
           this.setCooldown(
             route,
-            isConcurrencyLimit
-              ? 6
-              : Number.isFinite(retryHeader) && retryHeader > 0
-                ? retryHeader
-                : route.defaultCooldownSec,
+            Number.isFinite(retryHeader) && retryHeader > 0
+              ? retryHeader
+              : route.defaultCooldownSec,
           );
-        } else if (
-          res.status === 400 ||
-          res.status === 402 ||
-          res.status === 404 ||
-          res.status === 410 ||
-          res.status === 422
-        ) {
-          this.setCooldown(route, 300);
+        } else if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 404) {
+          this.setCooldown(route, 120);
         }
         throw new Error(`${route.provider}/${route.model}: HTTP ${res.status} (${errText})`);
       }
 
       const data = await res.json();
-      const choice = data?.choices?.[0];
-      const rawContent = choice?.message?.content;
+      const rawContent = isGateway ? data?.text : data?.choices?.[0]?.message?.content;
       const cleaned = cleanAssistantReply(rawContent);
 
-      // Reject empty or single-emoji-only replies (no letters or digits at all)
       const hasMeaningfulText = /[a-zA-Z0-9\u0600-\u06FF]/.test(cleaned);
       if (!cleaned || !hasMeaningfulText) {
-        this.setCooldown(route, 20);
-        throw new Error(`${route.provider}/${route.model}: empty or emoji-only content`);
+        this.setCooldown(route, 15);
+        throw new Error(`${route.provider}/${route.model}: empty or non-text content`);
       }
 
       const latencyMs = Date.now() - startedAt;
@@ -173,36 +256,24 @@ export class FathyAiClient {
       };
     } catch (err) {
       clearTimeout(timeout);
-      if (externalSignal?.aborted) {
-        throw new Error(`${route.provider}/${route.model}: cancelled (sibling won)`);
-      }
       const msg = err instanceof Error ? err.message : String(err);
       if (!this.isInCooldown(route)) {
-        this.setCooldown(route, 25);
+        this.setCooldown(route, 15);
       }
-      throw new Error(msg.startsWith(`${route.provider}/`) ? msg : `${route.provider}/${route.model}: ${msg}`);
-    } finally {
-      externalSignal?.removeEventListener("abort", onExternalAbort);
+      throw new Error(
+        msg.startsWith(`${route.provider}/`) ? msg : `${route.provider}/${route.model}: ${msg}`,
+      );
     }
   }
 
-  /**
-   * Call AI providers strictly in priority order (Requesty on top, then UnoRouter & Logfare)
-   * with 1 concurrent request per provider (respects Requesty's free concurrency=1 limit)
-   * and a hard total deadline so a chat queue can never stall.
-   */
-  async generateReply({ messages, isGroup = false, remoteJid = "", quotationsSummary = "" }) {
+  async runWithRoutes(fullMessages, { temperature = 0.55, validate = null } = {}) {
     if (!this.providers || this.providers.length === 0) {
       throw new Error(
-        "No AI providers configured. Set REQUESTY_API_KEY, UNOROUTER_API_KEY, or LOGFARE_API_KEY.",
+        "No Gemini backend configured. Set GEMINI_API_KEY (for cloud/multi-user) or AGY_GATEWAY_URL + AGY_GATEWAY_TOKEN (for local 127.0.0.1 single-user gateway).",
       );
     }
 
-    const systemPrompt = this.buildSystemPrompt({ isGroup, remoteJid, quotationsSummary });
-    const fullMessages = [{ role: "system", content: systemPrompt }, ...messages];
-
     const now = Date.now();
-    const deadlineAt = now + 50_000;
     const ready = this.providers.filter((r) => !this.isInCooldown(r, now));
     const ordered =
       ready.length > 0
@@ -214,23 +285,53 @@ export class FathyAiClient {
           );
 
     const errors = [];
-    const maxAttempts = Math.min(ordered.length, 8);
-
-    for (let i = 0; i < maxAttempts; i++) {
-      if (Date.now() > deadlineAt) {
-        errors.push("overall_deadline_exceeded");
-        break;
-      }
-      const route = ordered[i];
+    for (const route of ordered) {
       try {
-        return await this.callSingleRoute(route, fullMessages);
+        const res = await this.callSingleRoute(route, fullMessages, { temperature });
+        if (validate) {
+          const validated = validate(res);
+          return { ...res, ...validated };
+        }
+        return res;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[Fathy AI] Fallback from ${route.provider}/${route.model}: ${msg}`);
+        console.warn(`[Fathy Gemini] Fallback from ${route.provider}/${route.model}: ${msg}`);
         errors.push(msg);
       }
     }
 
-    throw new Error(`All AI providers failed: ${errors.slice(0, 6).join(" | ")}`);
+    throw new Error(`Gemini request failed: ${errors.slice(0, 4).join(" | ")}`);
+  }
+
+  async generateReply({ messages, isGroup = false, remoteJid = "", quotationsSummary = "" }) {
+    const systemPrompt = this.buildSystemPrompt({ isGroup, remoteJid, quotationsSummary });
+    const fullMessages = [{ role: "system", content: systemPrompt }, ...messages];
+    return this.runWithRoutes(fullMessages, { temperature: 0.6 });
+  }
+
+  /**
+   * Generate a structured Star Belt quotation JSON draft from raw text / pasted WhatsApp order
+   * (used by the Quotation App's in-app Fathy AI modal via `POST /api/fathy/draft-quotation`).
+   */
+  async generateQuotationDraft({ prompt, quotationsSummary = "" }) {
+    const systemContent = quotationsSummary
+      ? `${DRAFT_QUOTATION_SYSTEM_PROMPT}\n\nللمرجعية فقط — أمثلة من أسماء العملاء والأصناف الأخيرة في ستار بيلت:\n${quotationsSummary}`
+      : DRAFT_QUOTATION_SYSTEM_PROMPT;
+
+    const fullMessages = [
+      { role: "system", content: systemContent },
+      { role: "user", content: String(prompt || "").trim() },
+    ];
+
+    return this.runWithRoutes(fullMessages, {
+      temperature: 0.2,
+      validate: (res) => {
+        const draft = parseJsonObjectFromAi(res.text);
+        if (!draft || (!Array.isArray(draft.items) && !draft.client)) {
+          throw new Error(`${res.provider}/${res.model}: invalid quotation JSON output`);
+        }
+        return { draft, rawText: res.text };
+      },
+    });
   }
 }

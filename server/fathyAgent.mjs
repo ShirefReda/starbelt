@@ -16,6 +16,13 @@ import {
   isFathyTrigger,
 } from "./trigger.mjs";
 import { normalizeMessageRecord } from "./contextStore.mjs";
+import {
+  buildQuotationFromDraft,
+  buildQuotationShareUrl,
+  extractCreateQuotationCommand,
+  formatQuotationWhatsAppCard,
+  saveQuotationToSupabaseServer,
+} from "./quotationTool.mjs";
 
 const QUOTATION_KEYWORDS_RE =
   /(?:عرض\s*سعر|عروض\s*الاسعار|بيان\s*سعر|سعر|اسعار|تسعير|فاتور|عميل|عملاء|ستار\s*بيلت|ستاربلت|سير|سيور|quotation|quote|price|invoice|starbelt)/i;
@@ -52,6 +59,7 @@ export class FathyAgent {
       messagesBuffered: 0,
       triggersHandled: 0,
       repliesSent: 0,
+      quotationsCreated: 0,
       errors: 0,
       lastEventAt: null,
       lastReplyAt: null,
@@ -187,6 +195,19 @@ export class FathyAgent {
       return { skipped: true, reason: "buffered_sleeping" };
     }
 
+    // Hard Rule #3 (`agy-server-brief.md`): the private single-user `agy` gateway may ONLY serve
+    // the owner (`fromMe === true`). For other people / customers, use official GEMINI_API_KEY.
+    if (
+      typeof this.aiClient.isPrivateGatewayOnly === "function" &&
+      this.aiClient.isPrivateGatewayOnly() &&
+      !fromMe
+    ) {
+      console.warn(
+        `[Fathy] Skipped third-party WhatsApp trigger in ${remoteJid}: private 127.0.0.1 agy gateway is owner-only. Set GEMINI_API_KEY for customer chats.`,
+      );
+      return { skipped: true, reason: "private_gateway_owner_only" };
+    }
+
     this.stats.triggersHandled++;
     this.contextStore.activateSession(remoteJid, pushName || (fromMe ? "owner" : ""));
 
@@ -238,7 +259,49 @@ export class FathyAgent {
       quotationsSummary,
     });
 
-    const chunks = splitWhatsAppMessage(aiResult.text, 3500);
+    // SmartCycle: detect & execute <CREATE_QUOTATION> command if Fathy generated a price offer
+    let finalReplyText = aiResult.text;
+    let createdQuotation = null;
+    const quoteCmd = extractCreateQuotationCommand(aiResult.text);
+    if (quoteCmd.found && quoteCmd.draft) {
+      const { quotation, totals } = buildQuotationFromDraft(quoteCmd.draft);
+      const saveRes = await saveQuotationToSupabaseServer(quotation, {
+        supabaseUrl: this.config.supabaseUrl,
+        supabaseAnonKey: this.config.supabaseAnonKey,
+      });
+      if (!saveRes.saved) {
+        console.warn(`[Fathy SmartCycle] Supabase save failed for ${quotation.id}:`, saveRes.error);
+      } else {
+        // Invalidate recent quotations cache so follow-ups immediately see this new offer
+        this.contextStore.quotationsCache = { fetchedAt: 0, summary: "" };
+      }
+
+      const publicBaseUrl = this.config.publicBaseUrl || "https://maker.starbelt.com.eg";
+      const shareUrl = buildQuotationShareUrl(quotation.id, publicBaseUrl);
+      const card = formatQuotationWhatsAppCard(quotation, totals, publicBaseUrl, {
+        savedToCloud: saveRes.saved,
+      });
+
+      finalReplyText = [quoteCmd.cleanedText, card].filter(Boolean).join("\n\n");
+      this.stats.quotationsCreated++;
+      createdQuotation = {
+        id: quotation.id,
+        number: quotation.number,
+        client: quotation.client,
+        total: totals.total,
+        shareUrl,
+        savedToCloud: saveRes.saved,
+      };
+      console.log(
+        `[Fathy SmartCycle] Created quotation ${quotation.number} (${quotation.id}) for "${quotation.client}" total=${totals.total} saved=${saveRes.saved}`,
+      );
+    } else if (quoteCmd.found && quoteCmd.cleanedText) {
+      // Malformed JSON inside tag — never leak raw tags to WhatsApp
+      console.warn(`[Fathy SmartCycle] Ignored malformed <CREATE_QUOTATION>: ${quoteCmd.parseError}`);
+      finalReplyText = quoteCmd.cleanedText;
+    }
+
+    const chunks = splitWhatsAppMessage(finalReplyText, 3500);
     for (let i = 0; i < chunks.length; i++) {
       const formatted =
         i === 0
@@ -260,6 +323,7 @@ export class FathyAgent {
       model: aiResult.model,
       latencyMs: aiResult.latencyMs,
       contextMessages: fullHistory.length,
+      ...(createdQuotation ? { createdQuotation } : {}),
     };
   }
 

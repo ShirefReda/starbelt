@@ -25,6 +25,7 @@ interface ToolbarProps {
   hasUnseenUpdate?: boolean;
   onShowUpdates: () => void;
   onShowHistory?: () => void;
+  onShowAiDraft?: () => void;
   onNew: () => void;
   onAddItem: () => void;
   onDownloadPdf: () => void;
@@ -47,6 +48,7 @@ export function Toolbar({
   hasUnseenUpdate = false,
   onShowUpdates,
   onShowHistory,
+  onShowAiDraft,
   onNew,
   onAddItem,
   onDownloadPdf,
@@ -99,6 +101,17 @@ export function Toolbar({
             >
               <IconHistory />
               <span class="btn__label">السجل</span>
+            </button>
+          )}
+          {onShowAiDraft && (
+            <button
+              type="button"
+              class="btn btn--secondary btn--ai"
+              onClick={onShowAiDraft}
+              title="إنشاء عرض سعر بالذكاء الاصطناعي (فتحي AI)"
+            >
+              <IconSparkle size={15} />
+              <span class="btn__label">فتحي AI</span>
             </button>
           )}
           <button

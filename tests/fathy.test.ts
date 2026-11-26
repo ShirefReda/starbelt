@@ -10,7 +10,15 @@ import {
 import { ChatContextStore, normalizeMessageRecord } from "../server/contextStore.mjs";
 import { FathyAiClient, cleanAssistantReply } from "../server/aiClient.mjs";
 import { FathyAgent, splitWhatsAppMessage } from "../server/fathyAgent.mjs";
-import { buildProviderChain } from "../server/config.mjs";
+import { buildProviderChain, isLoopbackGatewayUrl } from "../server/config.mjs";
+import {
+  buildQuotationFromDraft,
+  buildQuotationShareUrl,
+  computeQuotationTotals,
+  extractCreateQuotationCommand,
+  formatQuotationWhatsAppCard,
+  parseJsonObjectFromAi,
+} from "../server/quotationTool.mjs";
 
 describe("Fathy AI Trigger & Normalization", () => {
   it("normalizes Arabic variants, diacritics, and repeated letters", () => {
@@ -266,37 +274,46 @@ describe("Fathy AI Full Chat Context & Orchestration", () => {
     expect(store.isSessionActive(jid)).toBe(false);
   });
 
-  it("cleans thinking tags, splits long WhatsApp messages, and builds interleaved provider chain", () => {
+  it("cleans thinking tags, splits long WhatsApp messages, and builds Gemini-only provider chain", () => {
     expect(cleanAssistantReply("<think>internal thoughts</think> أهلاً بك!")).toBe("أهلاً بك!");
     expect(splitWhatsAppMessage("A".repeat(4000), 1500).length).toBeGreaterThanOrEqual(3);
 
-    const chainWithRequesty = buildProviderChain({
-      REQUESTY_API_KEY: "rqsty-test",
-      UNOROUTER_API_KEY: "sk-test",
-      LOGFARE_API_KEY: "lfu-test",
+    // Official Gemini API key
+    const geminiApiChain = buildProviderChain({
+      GEMINI_API_KEY: "AIza-test-key",
     });
-    expect(chainWithRequesty[0]?.provider).toBe("requesty");
-    expect(chainWithRequesty[0]?.model).toBe("google/gemma-4-31b-it");
-    expect(chainWithRequesty[1]?.provider).toBe("requesty");
-    expect(chainWithRequesty[1]?.model).toBe("nvidia/nemotron-3-ultra-550b-a55b");
+    expect(geminiApiChain[0]?.provider).toBe("gemini");
+    expect(geminiApiChain[0]?.model).toBe("gemini-2.5-flash");
+    expect(geminiApiChain[1]?.provider).toBe("gemini");
+    expect(geminiApiChain[1]?.model).toBe("gemini-2.5-flash-lite");
 
-    const chain = buildProviderChain({
-      UNOROUTER_API_KEY: "sk-test",
-      LOGFARE_API_KEY: "lfu-test",
+    // Private loopback agy gateway (127.0.0.1 only)
+    const localGatewayChain = buildProviderChain({
+      AGY_GATEWAY_URL: "http://127.0.0.1:8787",
+      AGY_GATEWAY_TOKEN: "a".repeat(40),
     });
-    expect(chain.length).toBeGreaterThan(10);
-    expect(chain[0]?.provider).toBe("unorouter");
-    expect(chain[0]?.model).toBe("gemini-3.6-flash:free");
-    expect(chain[1]?.provider).toBe("logfare");
-    expect(chain[1]?.model).toBe("deepseek-v4.1-flash");
+    expect(localGatewayChain).toHaveLength(1);
+    expect(localGatewayChain[0]?.provider).toBe("gemini-gateway");
+    expect(localGatewayChain[0]?.model).toBe("gemini-3.8-flash-medium");
 
-    // Generic AI_BASE_URL=logfare.ai must pick Logfare models (never gemini-3.6-flash:free)
-    const genericLogfare = buildProviderChain({
-      AI_BASE_URL: "https://logfare.ai/v1",
-      AI_API_KEY: "lfu-generic",
+    // Public/non-loopback gateway URL MUST be rejected (Hard Rule #4)
+    expect(isLoopbackGatewayUrl("http://127.0.0.1:8787")).toBe(true);
+    expect(isLoopbackGatewayUrl("http://localhost:8787")).toBe(true);
+    expect(isLoopbackGatewayUrl("https://evil.example.com")).toBe(false);
+    expect(isLoopbackGatewayUrl("http://0.0.0.0:8787")).toBe(false);
+    const rejectedPublic = buildProviderChain({
+      AGY_GATEWAY_URL: "https://public.example.com",
+      AGY_GATEWAY_TOKEN: "a".repeat(40),
     });
-    expect(genericLogfare[0]?.provider).toBe("logfare");
-    expect(genericLogfare[0]?.model).toBe("deepseek-v4.1-flash");
+    expect(rejectedPublic).toHaveLength(0);
+
+    // Old third-party providers (Requesty/UnoRouter/Logfare) are completely removed
+    const legacyIgnored = buildProviderChain({
+      REQUESTY_API_KEY: "rqsty-old",
+      UNOROUTER_API_KEY: "sk-old",
+      LOGFARE_API_KEY: "lfu-old",
+    });
+    expect(legacyIgnored).toHaveLength(0);
   });
 
   it("routes replies to remoteJidAlt when incoming message uses WhatsApp @lid", async () => {
@@ -346,19 +363,265 @@ describe("Fathy AI Full Chat Context & Orchestration", () => {
     expect(sentTargets).toEqual(["201012345678@s.whatsapp.net"]);
   });
 
-  it("tracks per-model cooldowns in FathyAiClient", () => {
+  it("tracks per-model cooldowns and private-gateway owner-only mode in FathyAiClient", () => {
     const client = new FathyAiClient([
       {
-        provider: "unorouter",
-        baseUrl: "https://api.unorouter.com/v1",
+        provider: "gemini",
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
         apiKey: "k",
-        model: "gemini-3.6-flash:free",
-        defaultCooldownSec: 65,
+        model: "gemini-2.5-flash",
+        defaultCooldownSec: 20,
       },
     ]);
     const route = client.providers[0];
     expect(client.isInCooldown(route)).toBe(false);
     client.setCooldown(route, 60);
     expect(client.isInCooldown(route)).toBe(true);
+    expect(client.isPrivateGatewayOnly()).toBe(false);
+
+    const gwOnly = new FathyAiClient([
+      {
+        provider: "gemini-gateway",
+        baseUrl: "http://127.0.0.1:8787",
+        apiKey: "a".repeat(40),
+        model: "gemini-3.8-flash-medium",
+        defaultCooldownSec: 10,
+      },
+    ]);
+    expect(gwOnly.isPrivateGatewayOnly()).toBe(true);
+  });
+
+  it("enforces owner-only WhatsApp guard when running on private 127.0.0.1 agy gateway", async () => {
+    const mockEvolution = {
+      isConfigured: () => true,
+      sendTyping: vi.fn().mockResolvedValue(undefined),
+      fetchChatHistory: vi.fn().mockResolvedValue([]),
+      sendText: vi.fn().mockResolvedValue({ messageId: "GW-1" }),
+    };
+    const mockAiClient = {
+      lastSuccess: null,
+      isPrivateGatewayOnly: () => true,
+      generateReply: vi.fn().mockResolvedValue({
+        text: "تم يا شريف!",
+        provider: "gemini-gateway",
+        model: "gemini-3.8-flash-medium",
+        latencyMs: 500,
+      }),
+    };
+    const store = new ChatContextStore();
+    const agent = new FathyAgent({
+      config: { evolutionInstance: "starbelt", maxHistoryMessages: 50, providers: [] },
+      evolution: mockEvolution,
+      contextStore: store,
+      aiClient: mockAiClient,
+    });
+
+    // External sender (`fromMe: false`) MUST be blocked when only private agy gateway is configured
+    const blocked = await agent.handleWebhookPayload({
+      event: "messages.upsert",
+      instance: "starbelt",
+      data: {
+        key: { id: "ext-1", remoteJid: "201099999999@s.whatsapp.net", fromMe: false },
+        messageTimestamp: 1700000100,
+        message: { conversation: "يا فتحي ازيك" },
+      },
+    });
+    expect(blocked.results?.[0]?.skipped).toBe(true);
+    expect(blocked.results?.[0]?.reason).toBe("private_gateway_owner_only");
+    expect(mockAiClient.generateReply).not.toHaveBeenCalled();
+
+    // Owner (`fromMe: true`) IS allowed
+    const allowed = await agent.handleWebhookPayload({
+      event: "messages.upsert",
+      instance: "starbelt",
+      data: {
+        key: { id: "own-1", remoteJid: "201099999999@s.whatsapp.net", fromMe: true },
+        messageTimestamp: 1700000105,
+        message: { conversation: "يا فتحي لخصلي الكلام" },
+      },
+    });
+    expect(allowed.results?.[0]?.replied).toBe(true);
+    expect(mockAiClient.generateReply).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SmartCycle Quotation Builder & WhatsApp End-to-End Integration", () => {
+  it("builds a schema-valid Quotation with Arabic-Indic numbers, discount, and 14% VAT", () => {
+    const { quotation, totals } = buildQuotationFromDraft({
+      client: "شركة النيل للأغذية",
+      attention: "م. كريم",
+      items: [
+        { name: "سير ناقل PVC أخضر 50 سم × 12 متر", qty: "٢", price: "4,000" },
+        { name: "سير تايمنج", qty: 2, price: 1000 },
+      ],
+      showDiscount: true,
+      discountType: "percent",
+      discountPercent: 10,
+      showVat: true,
+      vatRate: 14,
+    });
+
+    expect(quotation.schemaVersion).toBe(1);
+    expect(quotation.id).toMatch(/^q_/);
+    expect(quotation.number).toMatch(/^SB-\d{4}-\d{4}$/);
+    expect(quotation.client).toBe("شركة النيل للأغذية");
+    expect(quotation.attention).toBe("م. كريم");
+    expect(quotation.items).toHaveLength(2);
+    expect(quotation.items[0]?.qty).toBe(2);
+    expect(quotation.items[0]?.price).toBe(4000);
+    // subtotal = 10,000; 10% discount = 1,000; taxable = 9,000; 14% VAT = 1,260; total = 10,260
+    expect(totals.subtotal).toBe(10000);
+    expect(totals.discountAmount).toBe(1000);
+    expect(totals.taxableBase).toBe(9000);
+    expect(totals.vatAmount).toBe(1260);
+    expect(totals.total).toBe(10260);
+
+    const recomputed = computeQuotationTotals(quotation.items, quotation.options);
+    expect(recomputed).toEqual(totals);
+  });
+
+  it("extracts <CREATE_QUOTATION> commands cleanly and strips raw tags", () => {
+    const aiText = `حاضر يا هندسة، جهزتلك عرض السعر فوراً:
+<CREATE_QUOTATION>
+\`\`\`json
+{
+  "client": "مصنع الرواد",
+  "items": [{ "name": "سير مطاط 60 سم", "qty": 3, "price": 2500 }],
+  "showVat": false
+}
+\`\`\`
+</CREATE_QUOTATION>`;
+
+    const parsed = extractCreateQuotationCommand(aiText);
+    expect(parsed.found).toBe(true);
+    expect(parsed.cleanedText).toBe("حاضر يا هندسة، جهزتلك عرض السعر فوراً:");
+    expect(parsed.draft?.client).toBe("مصنع الرواد");
+    expect(parsed.draft?.items).toHaveLength(1);
+
+    const malformed = extractCreateQuotationCommand("تمام <CREATE_QUOTATION>{bad json</CREATE_QUOTATION>");
+    expect(malformed.found).toBe(true);
+    expect(malformed.draft).toBeNull();
+    expect(malformed.cleanedText).toBe("تمام");
+
+    expect(parseJsonObjectFromAi('```json\n{"client":"Test","items":[]}\n```')).toEqual({
+      client: "Test",
+      items: [],
+    });
+  });
+
+  it("executes SmartCycle end-to-end: WhatsApp trigger -> AI <CREATE_QUOTATION> -> Supabase save -> deep-link card", async () => {
+    const jid = "201055555555@s.whatsapp.net";
+    const sentTexts: string[] = [];
+    const savedRows: Array<Record<string, unknown>> = [];
+
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (String(url).includes("/rest/v1/quotations")) {
+        if ((init?.method || "GET").toUpperCase() === "POST") {
+          const body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
+          savedRows.push(body);
+          return new Response(JSON.stringify([body]), {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return origFetch(url, init);
+    }) as unknown as typeof fetch;
+
+    try {
+      const mockEvolution = {
+        isConfigured: () => true,
+        sendTyping: vi.fn().mockResolvedValue(undefined),
+        fetchChatHistory: vi.fn().mockResolvedValue([]),
+        sendText: vi.fn().mockImplementation(async (_to: string, text: string) => {
+          sentTexts.push(text);
+          return { messageId: "SMART-1" };
+        }),
+      };
+
+      const mockAiClient = {
+        lastSuccess: null,
+        generateReply: vi.fn().mockResolvedValue({
+          text: `تم يا هندسة!\n<CREATE_QUOTATION>{"client":"شركة الشروق","items":[{"name":"سير 50 سم × 10 متر","qty":2,"price":3000}],"showVat":true,"vatRate":14}</CREATE_QUOTATION>`,
+          provider: "requesty",
+          model: "google/gemma-4-31b-it",
+          latencyMs: 850,
+        }),
+      };
+
+      const store = new ChatContextStore({
+        supabaseUrl: "https://example.supabase.co",
+        supabaseAnonKey: "anon-key",
+      });
+      const agent = new FathyAgent({
+        config: {
+          evolutionInstance: "starbelt",
+          maxHistoryMessages: 50,
+          publicBaseUrl: "https://maker.starbelt.com.eg",
+          supabaseUrl: "https://example.supabase.co",
+          supabaseAnonKey: "anon-key",
+          providers: [],
+        },
+        evolution: mockEvolution,
+        contextStore: store,
+        aiClient: mockAiClient,
+      });
+
+      const res = await agent.handleWebhookPayload({
+        event: "messages.upsert",
+        instance: "starbelt",
+        data: {
+          key: { id: "quote-req-1", remoteJid: jid, fromMe: false },
+          pushName: "م. شريف",
+          messageTimestamp: 1700000500,
+          message: { conversation: "يا فتحي اعمل عرض سعر لشركة الشروق 2 سير 50 سم × 10 متر بسعر 3000 شامل ضريبة" },
+        },
+      });
+
+      const firstResult = res.results?.[0] as {
+        replied?: boolean;
+        createdQuotation?: { id: string; total: number; shareUrl: string; savedToCloud: boolean };
+      };
+      expect(firstResult?.replied).toBe(true);
+      expect(firstResult?.createdQuotation?.savedToCloud).toBe(true);
+      expect(firstResult?.createdQuotation?.total).toBe(6840);
+      expect(savedRows).toHaveLength(1);
+      expect(savedRows[0]?.client).toBe("شركة الشروق");
+      expect(savedRows[0]?.total).toBe(6840);
+
+      // Verify WhatsApp reply contains the clickable deep-link and NEVER leaks raw <CREATE_QUOTATION> tags
+      expect(sentTexts).toHaveLength(1);
+      expect(sentTexts[0]).not.toContain("<CREATE_QUOTATION>");
+      expect(sentTexts[0]).toContain("https://maker.starbelt.com.eg/?quote=");
+      expect(sentTexts[0]).toContain("6,840");
+      expect(agent.stats.quotationsCreated).toBe(1);
+
+      const expectedUrl = buildQuotationShareUrl(
+        firstResult.createdQuotation!.id,
+        "https://maker.starbelt.com.eg",
+      );
+      expect(sentTexts[0]).toContain(expectedUrl);
+
+      const card = formatQuotationWhatsAppCard(
+        {
+          id: "q_test1234",
+          number: "SB-2026-1234",
+          client: "عميل تجريبي",
+          date: "26/11/2026",
+          items: [{ id: "it_1", name: "سير", qty: 1, price: 500 }],
+          options: { showVat: false, vatRate: 14 },
+        },
+        { subtotal: 500, discountAmount: 0, taxableBase: 500, vatAmount: 0, total: 500 },
+        "https://maker.starbelt.com.eg",
+      );
+      expect(card).toContain("https://maker.starbelt.com.eg/?quote=q_test1234");
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 });

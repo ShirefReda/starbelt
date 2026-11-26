@@ -7,7 +7,7 @@ export const ROOT_DIR = path.resolve(__dirname, "..");
 
 /**
  * Load key=value pairs from .env file without overriding existing process.env
- * (so Coolify environment variables always take precedence).
+ * (so Coolify / systemd environment variables always take precedence).
  */
 export function loadLocalEnv(envPath = path.join(ROOT_DIR, ".env")) {
   if (!fs.existsSync(envPath)) return;
@@ -43,88 +43,32 @@ function splitCsv(raw) {
     .filter(Boolean);
 }
 
-const DEFAULT_REQUESTY_MODELS = [
-  "google/gemma-4-31b-it",
-  "nvidia/nemotron-3-ultra-550b-a55b",
-  "novita/ling-3.1-flash",
-  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-  "nvidia/muse-glimmer-30b",
-];
-
-const DEFAULT_UNOROUTER_MODELS = [
-  "gemini-3.6-flash:free",
-  "gpt-4o:free",
-  "gpt-6-luna:free",
-  "mistral-small:free",
-  "nemotron-3-ultra-550b-a55b:free",
-  "deepseek-v4.1-flash:free",
-  "llama-3.1-8b:free",
-  "qwen2.5-coder-32b:free",
-  "minimax-m3.1-flash:free",
-  "glm-5.3-flash:free",
-  "gemma-4-31b-it:free",
-];
-
-const DEFAULT_LOGFARE_MODELS = [
-  "deepseek-v4.1-flash",
-  "openai/gpt-6-luna",
-  "logfare/auto",
-  "qwen-3.8-27b",
-  "tencent/hy4",
-  "minimax-m3.1-flash",
-  "grok-4.7",
-  "kimi-k3.1-pro",
-  "glm-5.3-flash",
-];
+const DEFAULT_GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+const DEFAULT_GATEWAY_MODEL = "gemini-3.8-flash-medium";
 
 /**
- * Build an interleaved multi-provider AI route list.
- * Interleaving UnoRouter (1 req/min per free model, 1M context Gemini/Luna/GPT-4o)
- * with Logfare (40 req/min Premium, GPT-6 Luna / DeepSeek / Step-5) ensures instant
- * responses even during rapid back-to-back WhatsApp conversations.
+ * Strictly verify that the private `agy` gateway URL is loopback-only
+ * (`127.0.0.1`, `localhost`, or `[::1]`) per `agy-server-brief.md` Hard Rule #4.
+ */
+export function isLoopbackGatewayUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return false;
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    return host === "127.0.0.1" || host === "localhost" || host === "::1" || host === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Build the Gemini-only AI route list:
+ * 1. Official Google Gemini API (`GEMINI_API_KEY`) — recommended for multi-user / Coolify deployment.
+ * 2. Private single-user local `gemini-api/gateway.py` (`AGY_GATEWAY_URL` + `AGY_GATEWAY_TOKEN`),
+ *    strictly loopback-only (`127.0.0.1`) for single-user personal operation.
  */
 export function buildProviderChain(env = process.env) {
-  const requestyKey = (env.REQUESTY_API_KEY || "").trim();
-  const requestyUrl = (env.REQUESTY_BASE_URL || "https://router.requesty.ai/v1")
-    .trim()
-    .replace(/\/+$/, "");
-
-  const unorouterKey = (env.UNOROUTER_API_KEY || "").trim();
-  const unorouterUrl = (env.UNOROUTER_BASE_URL || "https://api.unorouter.com/v1")
-    .trim()
-    .replace(/\/+$/, "");
-
-  const logfareKey = (env.LOGFARE_API_KEY || "").trim();
-  const logfareUrl = (env.LOGFARE_BASE_URL || "https://logfare.ai/v1")
-    .trim()
-    .replace(/\/+$/, "");
-
-  const genericKey = (env.OPENAI_API_KEY || env.AI_API_KEY || "").trim();
-  const genericUrl = (env.OPENAI_BASE_URL || env.AI_BASE_URL || "")
-    .trim()
-    .replace(/\/+$/, "");
-
-  const requestyModels =
-    splitCsv(env.REQUESTY_MODELS).length > 0
-      ? splitCsv(env.REQUESTY_MODELS)
-      : DEFAULT_REQUESTY_MODELS;
-
-  const unorouterModels =
-    splitCsv(env.UNOROUTER_MODELS || env.TOP_10_FREE_MODELS).length > 0
-      ? splitCsv(env.UNOROUTER_MODELS || env.TOP_10_FREE_MODELS)
-      : DEFAULT_UNOROUTER_MODELS;
-
-  const logfareModels =
-    splitCsv(env.LOGFARE_MODELS).length > 0
-      ? splitCsv(env.LOGFARE_MODELS)
-      : [
-          ...(env.LOGFARE_PRIMARY_MODEL ? [env.LOGFARE_PRIMARY_MODEL.trim()] : []),
-          ...splitCsv(env.LOGFARE_FALLBACK_MODELS),
-        ].filter(Boolean);
-
-  const effectiveLogfareModels =
-    logfareModels.length > 0 ? Array.from(new Set(logfareModels)) : DEFAULT_LOGFARE_MODELS;
-
   const chain = [];
   const seen = new Set();
 
@@ -136,38 +80,49 @@ export function buildProviderChain(env = process.env) {
     chain.push({ provider, baseUrl, apiKey, model, defaultCooldownSec });
   };
 
-  // TIER 0 (VERY TOP): Requesty free flagship models (google/gemma-4-31b-it + nvidia/nemotron-3-ultra-550b + ...)
-  if (requestyKey) {
-    for (const model of requestyModels) {
-      pushRoute("requesty", requestyUrl, requestyKey, model, 30);
+  // 1. Official Google Gemini API (AI Studio / Vertex OpenAI-compatible endpoint)
+  const geminiKey = (env.GEMINI_API_KEY || env.GOOGLE_API_KEY || "").trim();
+  const geminiUrl = (
+    env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai"
+  )
+    .trim()
+    .replace(/\/+$/, "");
+  const geminiModels =
+    splitCsv(env.GEMINI_MODELS).length > 0 ? splitCsv(env.GEMINI_MODELS) : DEFAULT_GEMINI_MODELS;
+
+  if (geminiKey) {
+    for (const model of geminiModels) {
+      pushRoute("gemini", geminiUrl, geminiKey, model, 20);
     }
   }
 
-  // TIER 1 (Fallbacks): Interleave UnoRouter with Logfare Premium so rate limits seamlessly switch providers
-  const maxLen = Math.max(unorouterModels.length, effectiveLogfareModels.length);
-  for (let i = 0; i < maxLen; i++) {
-    if (unorouterKey && unorouterModels[i]) {
-      pushRoute("unorouter", unorouterUrl, unorouterKey, unorouterModels[i], 65);
-    }
-    if (logfareKey && effectiveLogfareModels[i]) {
-      pushRoute("logfare", logfareUrl, logfareKey, effectiveLogfareModels[i], 20);
-    }
-  }
+  // 2. Private local single-user Gemini gateway (`gemini-api/gateway.py` on 127.0.0.1)
+  const gatewayToken = (
+    env.AGY_GATEWAY_TOKEN ||
+    env.GEMINI_GATEWAY_TOKEN ||
+    env.GATEWAY_TOKEN ||
+    ""
+  ).trim();
+  const gatewayUrl = (
+    env.AGY_GATEWAY_URL ||
+    env.GEMINI_GATEWAY_URL ||
+    (gatewayToken ? "http://127.0.0.1:8787" : "")
+  )
+    .trim()
+    .replace(/\/+$/, "");
+  const gatewayModel = (
+    env.AGY_GATEWAY_MODEL ||
+    env.AGY_MODEL ||
+    DEFAULT_GATEWAY_MODEL
+  ).trim();
 
-  // Fallback to generic OPENAI_API_KEY / AI_API_KEY if neither dedicated key was configured
-  if (chain.length === 0 && genericKey && genericUrl) {
-    const isLogfareGeneric = genericUrl.toLowerCase().includes("logfare.ai");
-    const explicitModels = splitCsv(
-      env.MODEL_FALLBACK_CHAIN || env.FALLBACK_MODELS || env.AI_MODEL_PRIMARY,
-    );
-    const genericModels =
-      explicitModels.length > 0
-        ? explicitModels
-        : isLogfareGeneric
-          ? DEFAULT_LOGFARE_MODELS
-          : [env.PRIMARY_MODEL || env.MODEL || "gemini-3.6-flash:free"];
-    for (const model of genericModels) {
-      pushRoute(isLogfareGeneric ? "logfare" : "openai-compat", genericUrl, genericKey, model, 30);
+  if (gatewayToken && gatewayUrl) {
+    if (isLoopbackGatewayUrl(gatewayUrl)) {
+      pushRoute("gemini-gateway", gatewayUrl, gatewayToken, gatewayModel, 10);
+    } else {
+      console.warn(
+        `[Fathy] Ignoring non-loopback AGY_GATEWAY_URL ("${gatewayUrl}"). Private agy gateway must bind to 127.0.0.1 only; use GEMINI_API_KEY for public/cloud deployments.`,
+      );
     }
   }
 
@@ -179,7 +134,7 @@ export function getConfig(env = process.env) {
   const evolutionBaseUrl = (
     env.EVOLUTION_BASE_URL ||
     env.VITE_EVOLUTION_BASE_URL ||
-    "https://wa.lahza.eu.cc"
+    "https://wa.starbelt.com.eg"
   )
     .trim()
     .replace(/\/+$/, "");

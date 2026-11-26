@@ -146,3 +146,25 @@ export async function fetchQuotationsFromSupabase(limit = 100): Promise<Quotatio
   }
 }
 
+/** Fetch a single quotation by ID from Supabase (used by SmartCycle `/?quote=<id>` deep-links) */
+export async function fetchQuotationById(id: string): Promise<Quotation | null> {
+  if (!supabase || !id.trim()) return null;
+  try {
+    const { data, error } = await supabase
+      .from("quotations")
+      .select("*")
+      .eq("id", id.trim())
+      .maybeSingle();
+
+    if (error || !data) {
+      if (error) console.warn("[Supabase] Fetch by ID error:", error.message);
+      return null;
+    }
+
+    return fromQuotationRow(data as QuotationRow);
+  } catch (err) {
+    console.warn("[Supabase] Failed to fetch quotation by ID:", err);
+    return null;
+  }
+}
+

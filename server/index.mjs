@@ -18,6 +18,11 @@ import { EvolutionClient } from "./evolution.mjs";
 import { ChatContextStore } from "./contextStore.mjs";
 import { FathyAiClient } from "./aiClient.mjs";
 import { FathyAgent } from "./fathyAgent.mjs";
+import {
+  buildQuotationFromDraft,
+  buildQuotationShareUrl,
+  saveQuotationToSupabaseServer,
+} from "./quotationTool.mjs";
 
 const DIST_DIR = path.join(ROOT_DIR, "dist");
 
@@ -247,6 +252,60 @@ export function createAppServer(customEnv = process.env) {
           remoteJid: String(body.remoteJid || `${config.ownerNumber}@s.whatsapp.net`),
         });
         sendJson(res, 200, { ok: true, ...result });
+      } catch (err) {
+        sendJson(res, 500, {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      return;
+    }
+
+    // ---- 4b. SmartCycle In-App Quotation Draft Generator (POST /api/fathy/draft-quotation) ----
+    if (method === "POST" && pathname === "/api/fathy/draft-quotation") {
+      try {
+        const body = await readJsonBody(req);
+        const rawText = String(body.text || body.prompt || "").trim();
+        if (!rawText) {
+          sendJson(res, 400, { ok: false, error: "يرجى كتابة أو لصق تفاصيل الطلب أولاً." });
+          return;
+        }
+        const quotationsSummary = await contextStore.getRecentQuotationsSummary();
+        const aiDraft = await aiClient.generateQuotationDraft({
+          prompt: rawText,
+          quotationsSummary,
+        });
+        const { quotation, totals } = buildQuotationFromDraft(aiDraft.draft);
+
+        let savedToSupabase = false;
+        let saveError = undefined;
+        if (body.saveToSupabase !== false) {
+          const saveRes = await saveQuotationToSupabaseServer(quotation, {
+            supabaseUrl: config.supabaseUrl,
+            supabaseAnonKey: config.supabaseAnonKey,
+          });
+          savedToSupabase = saveRes.saved;
+          if (saveRes.saved) {
+            contextStore.quotationsCache = { fetchedAt: 0, summary: "" };
+          } else {
+            saveError = saveRes.error;
+          }
+        }
+
+        const shareUrl = buildQuotationShareUrl(quotation.id, config.publicBaseUrl);
+        fathy.stats.quotationsCreated++;
+
+        sendJson(res, 200, {
+          ok: true,
+          quotation,
+          totals,
+          shareUrl,
+          savedToSupabase,
+          ...(saveError ? { saveError } : {}),
+          provider: aiDraft.provider,
+          model: aiDraft.model,
+          latencyMs: aiDraft.latencyMs,
+        });
       } catch (err) {
         sendJson(res, 500, {
           ok: false,

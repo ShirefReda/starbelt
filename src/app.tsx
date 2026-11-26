@@ -9,11 +9,12 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { WhatsappDialog } from "./components/WhatsappDialog";
 import { UpdatesDialog } from "./components/UpdatesDialog";
 import { QuotationsHistoryDialog } from "./components/QuotationsHistoryDialog";
+import { AiDraftDialog } from "./components/AiDraftDialog";
 import { CURRENT_VERSION, markVersionAsSeen, shouldShowUpdatesPrompt } from "./config/version";
 import { exportPdf } from "./pdf/exporter";
 import { requestFocus } from "./state/focusBus";
 import { mergeCompany } from "./config/companyMerge";
-import { saveQuotationToSupabase } from "./services/supabase";
+import { fetchQuotationById, saveQuotationToSupabase } from "./services/supabase";
 
 type Toast = { id: number; msg: string; error?: boolean };
 
@@ -23,6 +24,7 @@ export function App() {
   const [fitMode, setFitMode] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAiDraft, setShowAiDraft] = useState(false);
   const [showWhatsapp, setShowWhatsapp] = useState(false);
   const [showUpdates, setShowUpdates] = useState(() => shouldShowUpdatesPrompt());
   const [hasUnseenUpdate, setHasUnseenUpdate] = useState(() => shouldShowUpdatesPrompt());
@@ -69,6 +71,40 @@ export function App() {
     setToasts((t) => [...t, { id, msg, error }]);
     window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
   }, []);
+
+  // ---- SmartCycle Deep-Link Loader (`/?quote=<id>` from Fathy AI WhatsApp links) ----
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const quoteId = params.get("quote")?.trim();
+    if (!quoteId) return;
+
+    let cancelled = false;
+    (async () => {
+      let found = await fetchQuotationById(quoteId);
+      if (!found) {
+        found = repo.listQuotations().find((x) => x.id === quoteId) || null;
+      }
+      if (cancelled) return;
+
+      if (found) {
+        actions.loadQuotation(found);
+        repo.saveQuotation(found);
+        pushToast(`تم فتح عرض السعر (${found.number || found.client}) من فتحي AI ✨`);
+      } else {
+        pushToast("تعذر العثور على عرض السعر المطلوب في السحابة", true);
+      }
+
+      // Clean `?quote=` from URL without reloading the page
+      params.delete("quote");
+      const nextSearch = params.toString();
+      const cleanUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`;
+      window.history.replaceState({}, "", cleanUrl);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pushToast]);
 
   // ---- Fit-to-width -------------------------------------------------------
   const computeFit = useCallback(() => {
@@ -212,6 +248,7 @@ export function App() {
           hasUnseenUpdate={hasUnseenUpdate}
           onShowUpdates={handleOpenUpdates}
           onShowHistory={() => setShowHistory(true)}
+          onShowAiDraft={() => setShowAiDraft(true)}
           onNew={handleNew}
           onAddItem={handleAddItem}
           onDownloadPdf={handleDownloadPdf}
@@ -288,6 +325,17 @@ export function App() {
           onClose={() => setShowHistory(false)}
           onSelectQuotation={(q) => {
             actions.loadQuotation(q);
+          }}
+          onToast={pushToast}
+        />
+      )}
+
+      {showAiDraft && (
+        <AiDraftDialog
+          onClose={() => setShowAiDraft(false)}
+          onApplyQuotation={(q) => {
+            actions.loadQuotation(q);
+            repo.saveQuotation(q);
           }}
           onToast={pushToast}
         />
