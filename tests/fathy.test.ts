@@ -657,7 +657,15 @@ describe("SmartCycle Quotation Builder & WhatsApp End-to-End Integration", () =>
 
   it("renders & sends the official PDF document on WhatsApp when creating or resending a quotation", async () => {
     const jid = "201077777777@s.whatsapp.net";
-    const sentDocs: Array<{ to: string; fileName: string; mimetype: string; base64: string; caption: string }> = [];
+    const sentTexts: Array<{ to: string; text: string; messageId: string }> = [];
+    const sentDocs: Array<{
+      to: string;
+      fileName: string;
+      mimetype: string;
+      base64: string;
+      caption: string;
+      quotedKey?: { id?: string; fromMe?: boolean; remoteJid?: string };
+    }> = [];
 
     const origFetch = globalThis.fetch;
     globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
@@ -700,11 +708,26 @@ describe("SmartCycle Quotation Builder & WhatsApp End-to-End Integration", () =>
         isConfigured: () => true,
         sendTyping: vi.fn().mockResolvedValue(undefined),
         fetchChatHistory: vi.fn().mockResolvedValue([]),
-        sendText: vi.fn().mockResolvedValue({ messageId: "TXT-1" }),
-        sendDocument: vi.fn().mockImplementation(async (to: string, payload: { fileName: string; mimetype: string; base64: string; caption: string }) => {
-          sentDocs.push({ to, ...payload });
-          return { messageId: `PDF-${sentDocs.length}` };
+        sendText: vi.fn().mockImplementation(async (to: string, text: string) => {
+          const messageId = `TXT-${sentTexts.length + 1}`;
+          sentTexts.push({ to, text, messageId });
+          return { messageId, raw: { key: { remoteJid: to, fromMe: true, id: messageId } } };
         }),
+        sendDocument: vi.fn().mockImplementation(
+          async (
+            to: string,
+            payload: {
+              fileName: string;
+              mimetype: string;
+              base64: string;
+              caption: string;
+              quotedKey?: { id?: string; fromMe?: boolean; remoteJid?: string };
+            },
+          ) => {
+            sentDocs.push({ to, ...payload });
+            return { messageId: `PDF-${sentDocs.length}` };
+          },
+        ),
       };
 
       const mockPdfGen = {
@@ -754,7 +777,7 @@ describe("SmartCycle Quotation Builder & WhatsApp End-to-End Integration", () =>
         pdfGenerator: mockPdfGen,
       });
 
-      // 1. Create new quotation -> sends real PDF document directly on WhatsApp!
+      // 1. Create new quotation -> sends text message FIRST, then replies ON that text message with clean PDF!
       const r1 = await agent.handleWebhookPayload({
         event: "messages.upsert",
         instance: "starbelt",
@@ -765,10 +788,14 @@ describe("SmartCycle Quotation Builder & WhatsApp End-to-End Integration", () =>
         },
       });
       expect((r1.results?.[0] as { pdfSent?: { fileName: string } })?.pdfSent?.fileName).toContain("مصنع الأمل");
+      expect(sentTexts).toHaveLength(1);
+      expect(sentTexts[0]?.text).toContain("https://maker.starbelt.com.eg/?quote=");
+      expect(sentTexts[0]?.text).not.toContain("<CREATE_QUOTATION>");
       expect(sentDocs).toHaveLength(1);
       expect(sentDocs[0]?.mimetype).toBe("application/pdf");
-      expect(sentDocs[0]?.caption).toContain("https://maker.starbelt.com.eg/?quote=");
-      expect(sentDocs[0]?.caption).not.toContain("<CREATE_QUOTATION>");
+      expect(sentDocs[0]?.caption).toBe("");
+      expect(sentDocs[0]?.quotedKey?.id).toBe("TXT-1");
+      expect(sentDocs[0]?.quotedKey?.fromMe).toBe(true);
 
       // 2. Resend existing quotation PDF via <SEND_QUOTATION_PDF>
       const parsedCmd = extractSendPdfCommand('تمام <SEND_QUOTATION_PDF>{"id":"q_existing1"}</SEND_QUOTATION_PDF>');

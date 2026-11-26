@@ -312,7 +312,6 @@ export class FathyAgent {
     let pdfSentInfo = null;
     let quotationForPdf = null;
     let totalsForPdf = null;
-    let savedToCloudForCard = true;
     let introTextForPdf = "";
 
     const quoteCmd = extractCreateQuotationCommand(aiResult.text);
@@ -344,7 +343,6 @@ export class FathyAgent {
       };
       quotationForPdf = quotation;
       totalsForPdf = totals;
-      savedToCloudForCard = saveRes.saved;
       introTextForPdf = sanitizeQuotationIntroText(quoteCmd.cleanedText);
 
       const card = formatQuotationWhatsAppCard(quotation, totals, publicBaseUrl, {
@@ -367,7 +365,6 @@ export class FathyAgent {
         const publicBaseUrl = this.config.publicBaseUrl || "https://maker.starbelt.com.eg";
         quotationForPdf = existing;
         totalsForPdf = totals;
-        savedToCloudForCard = true;
         introTextForPdf = sanitizeQuotationIntroText(sendPdfCmd.cleanedText);
         const card = formatQuotationWhatsAppCard(existing, totals, publicBaseUrl, {
           savedToCloud: true,
@@ -386,7 +383,31 @@ export class FathyAgent {
       finalReplyText = sendPdfCmd.cleanedText;
     }
 
-    // If we have a quotation and headless Chromium PDF rendering is available, send the official Star Belt A4 PDF itself!
+    // 1. Send Fathy's text message FIRST (replying to the user's triggering message)
+    let botTextReplyKey = null;
+    const chunks = splitWhatsAppMessage(finalReplyText, 3500);
+    for (let i = 0; i < chunks.length; i++) {
+      const formatted =
+        i === 0
+          ? this.formatOutgoingReply(chunks[i])
+          : `${chunks[i]}${FATHY_SIGNATURE_MARKER}`;
+      const sentText = await this.sendAndTrack(
+        remoteJid,
+        replyTarget,
+        formatted,
+        i === 0 ? rawRecord.key : null,
+      );
+      if (i === 0 && sentText?.messageId) {
+        botTextReplyKey = sentText.raw?.key || {
+          remoteJid: replyTarget,
+          fromMe: true,
+          id: sentText.messageId,
+        };
+      }
+    }
+
+    // 2. If this reply has a quotation PDF, render the official Star Belt A4 PDF and send it
+    //    as a WhatsApp REPLY (quoted) directly on Fathy's text message above (clean PDF with no bot caption).
     if (
       quotationForPdf &&
       totalsForPdf &&
@@ -396,54 +417,19 @@ export class FathyAgent {
       typeof this.evolution.sendDocument === "function"
     ) {
       try {
-        void this.evolution.sendTyping(replyTarget, 6000);
+        void this.evolution.sendTyping(replyTarget, 5000);
         const pdf = await this.pdfGenerator.renderQuotationToPdf(quotationForPdf);
-        const publicBaseUrl = this.config.publicBaseUrl || "https://maker.starbelt.com.eg";
-        const card = formatQuotationWhatsAppCard(quotationForPdf, totalsForPdf, publicBaseUrl, {
-          savedToCloud: savedToCloudForCard,
-        });
-        const fullCaption = this.formatOutgoingReply(
-          [introTextForPdf, card].filter(Boolean).join("\n\n"),
+        await this.sendDocumentAndTrack(
+          remoteJid,
+          replyTarget,
+          {
+            base64: pdf.base64,
+            fileName: pdf.fileName,
+            caption: "",
+            mimetype: "application/pdf",
+          },
+          botTextReplyKey || rawRecord.key,
         );
-        // WhatsApp document captions safely fit ~1000 chars; if longer, put concise summary on PDF + full text after
-        if (fullCaption.length <= 1020) {
-          await this.sendDocumentAndTrack(
-            remoteJid,
-            replyTarget,
-            {
-              base64: pdf.base64,
-              fileName: pdf.fileName,
-              caption: fullCaption,
-              mimetype: "application/pdf",
-            },
-            rawRecord.key,
-          );
-        } else {
-          const shareUrl = buildQuotationShareUrl(quotationForPdf.id, publicBaseUrl);
-          const shortCaption = this.formatOutgoingReply(
-            `📄 *عرض سعر شركة ستار بيلت*\n🏢 العميل: *${quotationForPdf.client}*\n🔢 رقم العرض: ${quotationForPdf.number}\n🔗 للتعديل: ${shareUrl}`,
-          );
-          await this.sendDocumentAndTrack(
-            remoteJid,
-            replyTarget,
-            {
-              base64: pdf.base64,
-              fileName: pdf.fileName,
-              caption: shortCaption,
-              mimetype: "application/pdf",
-            },
-            rawRecord.key,
-          );
-          const chunks = splitWhatsAppMessage(finalReplyText, 3500);
-          for (let i = 0; i < chunks.length; i++) {
-            await this.sendAndTrack(
-              remoteJid,
-              replyTarget,
-              `${chunks[i]}${FATHY_SIGNATURE_MARKER}`,
-              null,
-            );
-          }
-        }
         this.stats.pdfsSent++;
         pdfSentInfo = {
           fileName: pdf.fileName,
@@ -451,25 +437,13 @@ export class FathyAgent {
           durationMs: pdf.durationMs,
         };
         console.log(
-          `[Fathy SmartCycle] Sent official A4 PDF "${pdf.fileName}" (${pdf.byteLength} bytes in ${pdf.durationMs}ms) to ${replyTarget}`,
+          `[Fathy SmartCycle] Sent official A4 PDF "${pdf.fileName}" (${pdf.byteLength} bytes in ${pdf.durationMs}ms) replying to ${botTextReplyKey?.id || "trigger"} in ${replyTarget}`,
         );
       } catch (pdfErr) {
         console.warn(
-          `[Fathy SmartCycle] PDF render/send failed, falling back to WhatsApp text card:`,
+          `[Fathy SmartCycle] PDF render/send failed (text summary was already sent):`,
           pdfErr instanceof Error ? pdfErr.message : pdfErr,
         );
-      }
-    }
-
-    // Standard text reply (or fallback if PDF render/send did not happen)
-    if (!pdfSentInfo) {
-      const chunks = splitWhatsAppMessage(finalReplyText, 3500);
-      for (let i = 0; i < chunks.length; i++) {
-        const formatted =
-          i === 0
-            ? this.formatOutgoingReply(chunks[i])
-            : `${chunks[i]}${FATHY_SIGNATURE_MARKER}`;
-        await this.sendAndTrack(remoteJid, replyTarget, formatted, i === 0 ? rawRecord.key : null);
       }
     }
 
