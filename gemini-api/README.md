@@ -13,6 +13,21 @@ Discovered directly via `agy --help`, `agy -p --help`, and `agy models`:
 - `--output-format text|stream-json`: plain text response for `/v1/ask`, NDJSON `text_delta` stream for `/v1/ask/stream`
 - `--dangerously-skip-permissions` is **never** used
 
+## Quick Setup (Auto-Installs `agy` If Missing)
+
+Run as your dedicated unprivileged Linux user (not root):
+
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+`setup.sh` automatically:
+1. Checks for `agy` and installs the official Antigravity CLI (`https://antigravity.google/cli/install.sh`) if missing.
+2. Creates `.venv` and installs `fastapi` + `uvicorn`.
+3. Creates a fixed empty workspace and a `chmod 600` `.env` with a 40-byte `GATEWAY_TOKEN`.
+4. Launches `SSH_CONNECTION=1 agy` if not yet signed in so `agy` prints its official sign-in link on a headless VPS.
+
 ## Server Setup (Manual Steps)
 
 1. Create a dedicated unprivileged user (no sudo) and empty workspace:
@@ -25,8 +40,10 @@ Discovered directly via `agy --help`, `agy -p --help`, and `agy models`:
 2. Install the official `agy` CLI as `agy-gateway` (from `antigravity.google`) and sign in interactively once:
    ```bash
    sudo -iu agy-gateway
-   agy
-   # On a headless VPS, use an SSH port-forward for the browser sign-in.
+   curl -fsSL https://antigravity.google/cli/install.sh | bash
+   export PATH="$HOME/.local/bin:$PATH"
+   # Force headless URL + code flow on a VPS:
+   SSH_CONNECTION=1 agy
    # Verify it works:
    agy -p "say hi"
    exit
